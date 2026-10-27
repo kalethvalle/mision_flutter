@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../models/mission_model.dart';
 import '../models/world_model.dart';
 import 'world/syntax_dart/syntax_dart_world.dart';
@@ -17,28 +18,28 @@ class GameStore extends ChangeNotifier {
 
   // Unificación de todas las misiones importadas por módulo
   List<MissionModel> get _allMissions => [
-        ...syntaxDartMissions,
-        ...layoutMissions,
-      ];
+    ...syntaxDartMissions,
+    ...layoutMissions,
+  ];
 
   List<WorldModel> get worlds => [
-        WorldModel(
-          id: 'world_1',
-          title: 'Mundo 1: Fundamentos de Dart',
-          description: 'Aprende variables, funciones, listas y null safety.',
-          icon: Icons.code_rounded,
-          color: const Color(0xFF38BDF8),
-          isUnlocked: true,
-        ),
-        WorldModel(
-          id: 'world_2',
-          title: 'Mundo 2: Layouts & Flexbox',
-          description: 'Alinea y distribuye widgets con Row, Column y Stack.',
-          icon: Icons.widgets_rounded,
-          color: const Color(0xFFA855F7),
-          isUnlocked: _isWorld1Completed,
-        ),
-      ];
+    WorldModel(
+      id: 'world_1',
+      title: 'Mundo 1: Fundamentos de Dart',
+      description: 'Tipos y variables, valores inmutables, funciones breves, listas tipadas y null safety.',
+      icon: Icons.code_rounded,
+      color: const Color(0xFF38BDF8),
+      isUnlocked: true,
+    ),
+    WorldModel(
+      id: 'world_2',
+      title: 'Mundo 2: Layouts & Flexbox',
+      description: 'Distribución horizontal y vertical, padding uniforme y superposición con Stack y Positioned.',
+      icon: Icons.widgets_rounded,
+      color: const Color(0xFFA855F7),
+      isUnlocked: _isWorld1Completed,
+    ),
+  ];
 
   // Getters & Métodos de estado
   ActiveScreen get activeScreen => _activeScreen;
@@ -53,7 +54,8 @@ class GameStore extends ChangeNotifier {
   String get selectedOptionId => _selectedOptionId;
   bool get isSuccess => _isSuccess;
   bool get showError => _showError;
-  bool get hasNextMission => _currentMissionIndex < currentWorldMissions.length - 1;
+  bool get hasNextMission =>
+      _currentMissionIndex < currentWorldMissions.length - 1;
   bool get hasPrevMission => _currentMissionIndex > 0;
 
   void selectWorld(String worldId) {

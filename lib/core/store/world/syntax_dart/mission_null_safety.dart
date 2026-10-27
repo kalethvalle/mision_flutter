@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../models/mission_model.dart';
 
 final missionNullSafety = MissionModel(
@@ -6,9 +7,17 @@ final missionNullSafety = MissionModel(
   worldId: 'world_1',
   worldTitle: 'Mundo 1: Fundamentos de Dart',
   missionTitle: 'Misión 5 • Null Safety (?)',
-  description:
-      'Un arma opcional puede ser nula si el héroe no tiene nada equipado. Marca el tipo de dato como anulable.',
-  hint: 'Añade un signo de interrogación (?) después del tipo para permitir valores null.',
+  description: 'Un arma opcional puede ser nula si el héroe no tiene nada equipado. Marca el tipo de dato como anulable.',
+  learningContextParagraphs: const [
+    'Los tipos de Dart no aceptan null de manera predeterminada. Cuando la ausencia de un valor es válida, la declaración debe expresarlo.',
+    'El héroe puede tener un arma de texto o no tener ninguna, por lo que ambos estados deben ser válidos.',
+  ],
+  instructions: const [
+    'Observa que armaEquipada comienza con el valor null.',
+    'Conserva el tipo de texto para cuando exista un arma.',
+    'Elige la variante que permita valor y ausencia de valor.',
+  ],
+  hint: 'La declaración debe permitir tanto texto como ausencia de valor.',
   category: MissionCategory.dartBasics,
   targetPlaceholder: '{{ nullableType }}',
   codeTemplate: [
@@ -34,7 +43,9 @@ final missionNullSafety = MissionModel(
           ),
           const SizedBox(height: 16),
           Text(
-            isCorrect ? 'Estado: Sin arma (Seguro contra Null)' : 'Error: No acepta null',
+            isCorrect
+                ? 'Estado: Sin arma (Seguro contra Null)'
+                : 'Error: No acepta null',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,

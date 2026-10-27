@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../models/mission_model.dart';
 
 final missionRowAlignment = MissionModel(
@@ -6,9 +7,17 @@ final missionRowAlignment = MissionModel(
   worldId: 'world_2',
   worldTitle: 'Mundo 2: Layouts & Flexbox',
   missionTitle: 'Misión 1 • Distribución Horizontal (Row)',
-  description:
-      'Ajusta la alineación del Row para colocar las 3 gemas dentro de los objetivos marcados.',
-  hint: 'Usa "spaceBetween" para colocar elementos al inicio, al final y con espacio uniforme.',
+  description: 'Ajusta la alineación del Row para colocar las 3 gemas dentro de los objetivos marcados.',
+  learningContextParagraphs: const [
+    'Row organiza widgets horizontalmente. Su eje principal también es horizontal y la alineación determina cómo se reparte el espacio libre.',
+    'Las tres gemas deben coincidir con objetivos ubicados en el inicio, centro y final del área disponible.',
+  ],
+  instructions: const [
+    'Compara las gemas con las tres siluetas objetivo.',
+    'Observa que la primera y la última ocupan los extremos.',
+    'Elige la distribución que deje espacio solo entre elementos.',
+  ],
+  hint: 'El espacio libre debe quedar entre las gemas, no alrededor de los extremos.',
   category: MissionCategory.layout,
   targetPlaceholder: '{{ alignment }}',
   codeTemplate: [
@@ -22,16 +31,34 @@ final missionRowAlignment = MissionModel(
     ')',
   ],
   options: const [
-    MissionOption(id: 'center', label: 'MainAxisAlignment.center', codeSnippet: 'MainAxisAlignment.center'),
-    MissionOption(id: 'space_between', label: 'MainAxisAlignment.spaceBetween', codeSnippet: 'MainAxisAlignment.spaceBetween'),
-    MissionOption(id: 'end', label: 'MainAxisAlignment.end', codeSnippet: 'MainAxisAlignment.end'),
+    MissionOption(
+      id: 'center',
+      label: 'MainAxisAlignment.center',
+      codeSnippet: 'MainAxisAlignment.center',
+    ),
+    MissionOption(
+      id: 'space_between',
+      label: 'MainAxisAlignment.spaceBetween',
+      codeSnippet: 'MainAxisAlignment.spaceBetween',
+    ),
+    MissionOption(
+      id: 'end',
+      label: 'MainAxisAlignment.end',
+      codeSnippet: 'MainAxisAlignment.end',
+    ),
   ],
   correctOptionId: 'space_between',
   previewBuilder: (context, selectedOptionId) {
     MainAxisAlignment alignment = MainAxisAlignment.start;
-    if (selectedOptionId == 'center') alignment = MainAxisAlignment.center;
-    if (selectedOptionId == 'space_between') alignment = MainAxisAlignment.spaceBetween;
-    if (selectedOptionId == 'end') alignment = MainAxisAlignment.end;
+    if (selectedOptionId == 'center') {
+      alignment = MainAxisAlignment.center;
+    }
+    if (selectedOptionId == 'space_between') {
+      alignment = MainAxisAlignment.spaceBetween;
+    }
+    if (selectedOptionId == 'end') {
+      alignment = MainAxisAlignment.end;
+    }
 
     return Stack(
       children: [
@@ -47,9 +74,14 @@ final missionRowAlignment = MissionModel(
                   height: 60,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.amber.withOpacity(0.4), width: 2),
+                    border: Border.all(
+                      color: Colors.amber.withOpacity(0.4),
+                      width: 2,
+                    ),
                   ),
-                  child: const Center(child: Icon(Icons.star_border_rounded, color: Colors.amber)),
+                  child: const Center(
+                    child: Icon(Icons.star_border_rounded, color: Colors.amber),
+                  ),
                 ),
               ),
             ),
@@ -85,7 +117,13 @@ class _Gema extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
-        boxShadow: [BoxShadow(color: color.withOpacity(0.5), blurRadius: 12, spreadRadius: 2)],
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.5),
+            blurRadius: 12,
+            spreadRadius: 2,
+          ),
+        ],
       ),
       child: const Icon(Icons.diamond_rounded, color: Colors.white, size: 32),
     );

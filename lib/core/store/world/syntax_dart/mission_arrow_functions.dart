@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../models/mission_model.dart';
 
 final missionArrowFunctions = MissionModel(
@@ -6,14 +7,21 @@ final missionArrowFunctions = MissionModel(
   worldId: 'world_1',
   worldTitle: 'Mundo 1: Fundamentos de Dart',
   missionTitle: 'Misión 3 • Funciones Flecha (=>)',
-  description:
-      'Completa la función de ataque especial simplificando su retorno con la sintaxis de flecha (=>).',
-  hint: 'En Dart, "=> expresión" equivale a un bloque con "{ return expresión; }".',
+  description: 'Completa la función de ataque especial simplificando su retorno con la sintaxis de flecha (=>).',
+  learningContextParagraphs: const [
+    'Una función que retorna una sola expresión puede escribirse de forma abreviada. La expresión se evalúa y su resultado se devuelve automáticamente.',
+    'El ataque especial solo necesita calcular y retornar el doble de la fuerza recibida.',
+  ],
+  instructions: const [
+    'Observa que la función solo calcula fuerza multiplicada por dos.',
+    'Relaciona ese cálculo con el retorno de una sola expresión.',
+    'Compara los operadores y elige la sintaxis abreviada.',
+  ],
+  hint:
+      'Busca la forma equivalente a un bloque que solo retorna una expresión.',
   category: MissionCategory.dartBasics,
   targetPlaceholder: '{{ arrow }}',
-  codeTemplate: [
-    'int calcularAtaque(int fuerza) {{ arrow }} fuerza * 2;',
-  ],
+  codeTemplate: ['int calcularAtaque(int fuerza) {{ arrow }} fuerza * 2;'],
   options: const [
     MissionOption(id: 'arrow', label: '=>', codeSnippet: '=>'),
     MissionOption(id: 'colon', label: ':', codeSnippet: ':'),
