@@ -1,10 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mision_flutter/core/models/mission_model.dart';
-import 'package:mision_flutter/core/store/world/layout/layout_world.dart';
-import 'package:mision_flutter/core/store/world/syntax_dart/syntax_dart_world.dart';
+
+import 'support/test_catalog_repository.dart';
 
 void main() {
-  final missions = <MissionModel>[...syntaxDartMissions, ...layoutMissions];
+  final repository = TestCatalogRepository();
+  final missions = <MissionModel>[
+    ...repository.missionsFor('world_1'),
+    ...repository.missionsFor('world_2'),
+  ];
 
   test('todas las misiones incluyen una guía pedagógica completa', () {
     expect(missions, hasLength(9));
@@ -36,7 +40,7 @@ void main() {
       expect(mission.hint.trim(), isNotEmpty, reason: mission.id);
 
       final correctOption = mission.options.firstWhere(
-        (option) => option.id == mission.correctOptionId,
+        (option) => option.id == repository.correctOptionIds[mission.id],
       );
       expect(
         mission.hint,
@@ -58,7 +62,6 @@ void main() {
         lessThanOrEqualTo(120),
         reason: '${mission.id}: segundo párrafo',
       );
-
       for (var index = 0; index < mission.instructions.length; index++) {
         expect(
           mission.instructions[index].length,

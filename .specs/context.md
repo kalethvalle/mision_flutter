@@ -9,32 +9,38 @@ resultado.
 
 ## Estado técnico actual
 
-- Aplicación Flutter multiplataforma con Dart 3.13.
+- Aplicación Flutter Web con cliente y servidor Dart local, usando Dart 3.13.
 - Material Design con tema oscuro personalizado.
 - Estado reactivo en memoria mediante `provider` y `ChangeNotifier`.
-- Dos mundos y nueve misiones definidas localmente:
+- Catálogo SQLite con dos mundos, nueve temas y nueve misiones:
   - Fundamentos de Dart: cinco misiones.
   - Layouts y Flexbox: cuatro misiones.
 - Cada misión presenta primero una guía pedagógica con contexto conceptual,
   aplicación práctica, tres pasos y una pista que no revela la respuesta.
 - El mapa resume explícitamente qué se aprende en cada mundo.
-- Sin persistencia, autenticación ni servicios de red.
+- La API local entrega el catálogo y comprueba respuestas sin exponer la
+  solución en los endpoints de lectura.
+- El progreso y los desbloqueos continúan en memoria; todavía no hay cuentas.
 
 ## Arquitectura y flujo de datos
 
-- `lib/main.dart` inicia `FlutterQuestApp`.
+- `lib/main.dart` inicia `FlutterQuestApp` con el repositorio HTTP.
 - `lib/app.dart` configura `MaterialApp` y expone `GameStore` mediante
   `MultiProvider`.
-- `lib/core/models` contiene los contratos de mundos, misiones y opciones.
-- `lib/core/store/game_store.dart` administra navegación, selección de
-  respuestas, validación, progreso y desbloqueo.
-- `lib/core/store/world` contiene el catálogo local de misiones por mundo.
+- `lib/core/models` contiene contratos Dart puros y serializables.
+- `lib/core/repositories` define los puertos de catálogo y respuesta, además
+  del adaptador HTTP usado por Flutter Web.
+- `lib/core/store/game_store.dart` administra carga asíncrona, navegación,
+  selección, feedback y desbloqueo temporal.
+- `lib/application/catalog` contiene los casos de uso del catálogo.
+- `lib/server` contiene API Shelf, migraciones, semilla y repositorios SQLite.
+- `bin/server.dart` sirve `build/web` y `/api/v1` desde el mismo origen.
 - `lib/features/home/view` presenta el mapa de mundos y la experiencia de cada
   misión.
 
-El flujo principal es: interfaz -> acción del usuario -> `GameStore` ->
-`notifyListeners()` -> reconstrucción de la interfaz. El progreso se pierde al
-cerrar o reiniciar la aplicación.
+El flujo principal es: interfaz → `GameStore` → repositorio HTTP → API → caso de
+uso → repositorio SQLite. La respuesta vuelve al store y `notifyListeners()`
+reconstruye la interfaz. El progreso se pierde al cerrar la aplicación.
 
 ## Convención SDD
 
@@ -58,12 +64,14 @@ cerrar o reiniciar la aplicación.
 | --- | --- | --- |
 | [`scaffolding`](./scaffolding/spec.md) | 2026-10-27 | Inicialización de Git con `develop`, adopción del contrato SDD, documentación de la línea base de Flutter Quest y reemplazo de la prueba de plantilla por un smoke test real. Consulta el [plan ejecutado](./scaffolding/plan.md). |
 | [`mission-guidance`](./mission-guidance/spec.md) | 2026-10-27 | Guía pedagógica previa para las nueve misiones, pistas sin respuesta explícita, tarjetas de aprendizaje para ambos mundos y adaptación responsive del mapa y la experiencia de misión. Consulta el [plan ejecutado](./mission-guidance/plan.md). |
+| [`catalog-foundation`](./catalog-foundation/spec.md) | 2026-10-27 | Catálogo persistente con migración y semilla idempotente, nueve temas, API local, comprobación segura de respuestas, adaptadores SQLite/HTTP y entrega de Flutter Web desde el mismo origen. Consulta el [plan ejecutado](./catalog-foundation/plan.md). |
 
 ## Deuda técnica conocida
 
-- El analizador reporta 11 avisos informativos: diez por el uso de
-  `withOpacity` y uno por un parámetro con guiones bajos redundantes.
-- `README.md` conserva el contenido genérico generado por Flutter.
-- No existen pruebas específicas para la lógica de progreso de `GameStore` ni
-  para el recorrido completo de las misiones.
+- No existen perfiles, autenticación ni aislamiento de datos por estudiante.
+- Los intentos, el progreso y la regla correcta de desbloqueo de HU-05 todavía
+  no se persisten; el comportamiento heredado continúa en memoria.
+- Android aún no tiene adaptador SQLite nativo ni validación en esta fase.
+- Falta una prueba integral de progreso que recorra y complete las nueve
+  misiones; catálogo, API y presentación sí cuentan con cobertura específica.
 
