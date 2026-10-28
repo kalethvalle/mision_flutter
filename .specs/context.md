@@ -15,6 +15,9 @@ resultado.
 - Dos mundos y nueve misiones definidas localmente:
   - Fundamentos de Dart: cinco misiones.
   - Layouts y Flexbox: cuatro misiones.
+- Cada misión presenta primero una guía pedagógica con contexto conceptual,
+  aplicación práctica, tres pasos y una pista que no revela la respuesta.
+- El mapa resume explícitamente qué se aprende en cada mundo.
 - Sin persistencia, autenticación ni servicios de red.
 
 ## Arquitectura y flujo de datos
@@ -54,6 +57,7 @@ cerrar o reiniciar la aplicación.
 | Feature | Fecha | Implementación |
 | --- | --- | --- |
 | [`scaffolding`](./scaffolding/spec.md) | 2026-10-27 | Inicialización de Git con `develop`, adopción del contrato SDD, documentación de la línea base de Flutter Quest y reemplazo de la prueba de plantilla por un smoke test real. Consulta el [plan ejecutado](./scaffolding/plan.md). |
+| [`mission-guidance`](./mission-guidance/spec.md) | 2026-10-27 | Guía pedagógica previa para las nueve misiones, pistas sin respuesta explícita, tarjetas de aprendizaje para ambos mundos y adaptación responsive del mapa y la experiencia de misión. Consulta el [plan ejecutado](./mission-guidance/plan.md). |
 
 ## Deuda técnica conocida
 

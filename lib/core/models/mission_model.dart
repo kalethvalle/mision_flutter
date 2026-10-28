@@ -20,13 +20,16 @@ class MissionModel {
   final String worldTitle;
   final String missionTitle;
   final String description;
+  final List<String> learningContextParagraphs;
+  final List<String> instructions;
   final String hint;
   final MissionCategory category;
   final List<String> codeTemplate;
   final String targetPlaceholder;
   final List<MissionOption> options;
   final String correctOptionId;
-  final Widget Function(BuildContext context, String selectedOptionId) previewBuilder;
+  final Widget Function(BuildContext context, String selectedOptionId)
+  previewBuilder;
 
   const MissionModel({
     required this.id,
@@ -34,6 +37,8 @@ class MissionModel {
     required this.worldTitle,
     required this.missionTitle,
     required this.description,
+    required this.learningContextParagraphs,
+    required this.instructions,
     required this.hint,
     required this.category,
     required this.codeTemplate,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../models/mission_model.dart';
 
 final missionVariables = MissionModel(
@@ -6,9 +7,17 @@ final missionVariables = MissionModel(
   worldId: 'world_1',
   worldTitle: 'Mundo 1: Fundamentos de Dart',
   missionTitle: 'Misión 1 • Variables y Tipos Primitivos',
-  description:
-      'Selecciona el tipo de dato adecuado para declarar la vida inicial (número entero) del personaje.',
-  hint: 'Usa "int" para números enteros. "double" es para decimales y "String" para texto.',
+  description: 'Selecciona el tipo de dato adecuado para declarar la vida inicial (número entero) del personaje.',
+  learningContextParagraphs: const [
+    'En Dart, el tipo define qué valores puede almacenar una variable y qué operaciones admite. Los números pueden ser enteros o incluir decimales.',
+    'La vida del héroe vale 100, por lo que debe representarse como un número sin parte decimal.',
+  ],
+  instructions: const [
+    'Observa el valor asignado a vidaHeroe y la vista previa.',
+    'Decide si 100 contiene una parte decimal.',
+    'Compara las opciones y elige el tipo para números enteros.',
+  ],
+  hint: 'Compara un valor sin decimal con uno que sí tiene parte decimal.',
   category: MissionCategory.dartBasics,
   targetPlaceholder: '{{ type }}',
   codeTemplate: [
