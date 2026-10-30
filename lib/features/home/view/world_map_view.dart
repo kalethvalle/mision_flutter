@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/world_model.dart';
+import '../../../core/models/progress_model.dart';
 import '../../../core/store/game_store.dart';
+import '../../../core/store/session_store.dart';
 import '../presentation/catalog_presentation_registry.dart';
 
 class WorldMapView extends StatelessWidget {
@@ -11,6 +13,7 @@ class WorldMapView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final store = context.watch<GameStore>();
+    final session = context.watch<SessionStore>();
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
@@ -30,6 +33,15 @@ class WorldMapView extends StatelessWidget {
             ),
           ],
         ),
+        actions: [
+          if (MediaQuery.sizeOf(context).width >= 600)
+            Center(child: Text(session.user!.displayName)),
+          IconButton(
+            onPressed: session.isSubmitting ? null : session.logout,
+            tooltip: 'Cerrar sesión',
+            icon: const Icon(Icons.logout),
+          ),
+        ],
       ),
       body: SafeArea(child: _bodyFor(store)),
     );
@@ -91,6 +103,7 @@ class _WorldList extends StatelessWidget {
                 final world = store.worlds[index];
                 return _WorldLearningCard(
                   world: world,
+                  progress: store.worldProgress(world.id),
                   onEnter: world.isUnlocked
                       ? () => store.selectWorld(world.id)
                       : null,
@@ -105,9 +118,14 @@ class _WorldList extends StatelessWidget {
 }
 
 class _WorldLearningCard extends StatelessWidget {
-  const _WorldLearningCard({required this.world, required this.onEnter});
+  const _WorldLearningCard({
+    required this.world,
+    required this.progress,
+    required this.onEnter,
+  });
 
   final WorldModel world;
+  final WorldProgressState? progress;
   final VoidCallback? onEnter;
 
   @override
@@ -203,6 +221,22 @@ class _WorldLearningCard extends StatelessWidget {
                   );
                 }).toList(),
               ),
+              const SizedBox(height: 10),
+              Text(
+                '${progress?.completedMissions ?? 0}/${progress?.totalMissions ?? 0} misiones completadas',
+                style: TextStyle(
+                  color: world.isUnlocked ? color : Colors.grey.shade600,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (!world.isUnlocked && progress?.lockReason != null) ...[
+                const SizedBox(height: 5),
+                Text(
+                  progress!.lockReason!,
+                  style: const TextStyle(color: Colors.amber, fontSize: 12),
+                ),
+              ],
             ],
           );
           final button = ElevatedButton(

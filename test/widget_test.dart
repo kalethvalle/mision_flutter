@@ -53,6 +53,18 @@ void main() {
     final codeTop = tester.getTopLeft(find.text('[ SELECCIONA ]')).dy;
     expect(guideTop, lessThan(codeTop));
 
+    final correctOptionId = repository.correctOptionIds[firstMission.id]!;
+    final correctOption = firstMission.options.singleWhere(
+      (option) => option.id == correctOptionId,
+    );
+    await tester.ensureVisible(find.text(correctOption.label));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(correctOption.label));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('PROBAR CÓDIGO'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('PROBAR CÓDIGO'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.arrow_forward));
     await tester.pumpAndSettle();
     expect(find.text(firstMission.learningContextParagraphs[0]), findsNothing);
@@ -92,6 +104,45 @@ void main() {
 
     expect(find.text('Servidor local no disponible.'), findsOneWidget);
     expect(find.text('REINTENTAR'), findsOneWidget);
+  });
+
+  testWidgets('crea docente y estudiante antes de iniciar el entrenamiento', (
+    tester,
+  ) async {
+    final repository = TestCatalogRepository(bootstrapRequired: true);
+    await _setViewport(tester, const Size(900, 900));
+    await tester.pumpWidget(FlutterQuestApp(catalogRepository: repository));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Crear docente inicial'), findsOneWidget);
+    await tester.enterText(
+      find.byType(TextFormField).at(0),
+      'Docente Principal',
+    );
+    await tester.enterText(find.byType(TextFormField).at(1), 'teacher');
+    await tester.enterText(find.byType(TextFormField).at(2), 'teacher1234');
+    await tester.tap(find.text('CREAR DOCENTE'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Panel docente • Docente Principal'), findsOneWidget);
+    await tester.enterText(find.byType(TextFormField).at(0), 'Ana Estudiante');
+    await tester.enterText(find.byType(TextFormField).at(1), 'ana');
+    await tester.enterText(find.byType(TextFormField).at(2), 'student1234');
+    await tester.ensureVisible(find.text('CREAR ESTUDIANTE'));
+    await tester.tap(find.text('CREAR ESTUDIANTE'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ana Estudiante'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Cerrar sesión'));
+    await tester.pumpAndSettle();
+    expect(find.text('Iniciar sesión'), findsOneWidget);
+    await tester.enterText(find.byType(TextFormField).at(0), 'ana');
+    await tester.enterText(find.byType(TextFormField).at(1), 'student1234');
+    await tester.tap(find.text('INGRESAR'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mapa de Mundos'), findsOneWidget);
+    expect(find.textContaining('Ana Estudiante'), findsOneWidget);
   });
 }
 

@@ -68,7 +68,11 @@ void main() {
     expect(await repository.listWorlds(), hasLength(2));
     expect(await repository.listWorldMissions('world_1'), hasLength(5));
     expect(
-      (await repository.checkMissionAnswer('w1_m1', 'int')).isCorrect,
+      (await repository.checkMissionAnswer(
+        'w1_m1',
+        'int',
+        hintUsed: false,
+      )).isCorrect,
       isTrue,
     );
     expect(requests, [

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/repositories/catalog_repository.dart';
-import 'core/store/game_store.dart';
-import 'features/home/view/home_screen.dart';
+import 'core/store/session_store.dart';
+import 'features/auth/view/session_gate.dart';
 
 class FlutterQuestApp extends StatelessWidget {
   const FlutterQuestApp({super.key, required this.catalogRepository});
@@ -15,7 +15,7 @@ class FlutterQuestApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (_) => GameStore(catalogRepository)..initialize(),
+          create: (_) => SessionStore(catalogRepository)..initialize(),
         ),
       ],
       child: MaterialApp(
@@ -24,7 +24,7 @@ class FlutterQuestApp extends StatelessWidget {
         theme: ThemeData.dark().copyWith(
           scaffoldBackgroundColor: const Color(0xFF0F172A),
         ),
-        home: const HomeScreen(),
+        home: SessionGate(repository: catalogRepository),
       ),
     );
   }

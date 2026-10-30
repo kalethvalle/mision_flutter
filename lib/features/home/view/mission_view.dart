@@ -102,6 +102,7 @@ class MissionView extends StatelessWidget {
               IconButton(
                 icon: const Icon(Icons.lightbulb_outline, color: Colors.amber),
                 onPressed: () {
+                  store.markHintUsed();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(mission.hint),
@@ -280,6 +281,9 @@ class _MissionGuidanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final completed =
+        context.watch<GameStore>().progress.mission(mission.id)?.isCompleted ??
+        false;
     return Container(
       key: ValueKey('mission-guidance-${mission.id}'),
       width: double.infinity,
@@ -298,6 +302,23 @@ class _MissionGuidanceCard extends StatelessWidget {
             icon: Icons.school_rounded,
             text: 'ANTES DE COMENZAR',
           ),
+          if (completed) ...[
+            const SizedBox(height: 10),
+            const Row(
+              children: [
+                Icon(Icons.check_circle, size: 17, color: Color(0xFF10B981)),
+                SizedBox(width: 6),
+                Text(
+                  'MISIÓN COMPLETADA',
+                  style: TextStyle(
+                    color: Color(0xFF6EE7B7),
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 12),
           Text(
             mission.missionTitle,

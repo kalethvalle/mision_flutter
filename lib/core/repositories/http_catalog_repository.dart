@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 
 import '../models/answer_check_result.dart';
 import '../models/mission_model.dart';
+import '../models/progress_model.dart';
+import '../models/user_model.dart';
 import '../models/world_model.dart';
 import 'catalog_repository.dart';
 
@@ -47,20 +49,94 @@ class HttpCatalogRepository implements FlutterQuestRepository {
   @override
   Future<AnswerCheckResult> checkMissionAnswer(
     String missionId,
-    String optionId,
-  ) async {
-    final response = await _client.post(
-      _baseUri.resolve('missions/${Uri.encodeComponent(missionId)}/check'),
-      headers: const {'content-type': 'application/json; charset=utf-8'},
-      body: jsonEncode({'optionId': optionId}),
+    String optionId, {
+    required bool hintUsed,
+  }) async {
+    final json = await _post(
+      'missions/${Uri.encodeComponent(missionId)}/check',
+      {'optionId': optionId, 'hintUsed': hintUsed},
     );
-    final json = _decode(response);
-    _throwWhenFailed(response, json);
     return AnswerCheckResult.fromJson(_object(json, 'result'));
+  }
+
+  @override
+  Future<AuthSnapshot> getAuthStatus() async {
+    return AuthSnapshot.fromJson(await _get('auth/status'));
+  }
+
+  @override
+  Future<UserModel> bootstrapTeacher({
+    required String username,
+    required String displayName,
+    required String password,
+  }) async {
+    final json = await _post('auth/bootstrap', {
+      'username': username,
+      'displayName': displayName,
+      'password': password,
+    });
+    return UserModel.fromJson(_object(json, 'user'));
+  }
+
+  @override
+  Future<UserModel> login({
+    required String username,
+    required String password,
+  }) async {
+    final json = await _post('auth/login', {
+      'username': username,
+      'password': password,
+    });
+    return UserModel.fromJson(_object(json, 'user'));
+  }
+
+  @override
+  Future<void> logout() async {
+    await _post('auth/logout', const {});
+  }
+
+  @override
+  Future<List<UserModel>> listUsers() async {
+    final json = await _get('users');
+    return json.objectList('users').map(UserModel.fromJson).toList();
+  }
+
+  @override
+  Future<UserModel> createStudent({
+    required String username,
+    required String displayName,
+    required String password,
+  }) async {
+    final json = await _post('users', {
+      'username': username,
+      'displayName': displayName,
+      'password': password,
+    });
+    return UserModel.fromJson(_object(json, 'user'));
+  }
+
+  @override
+  Future<StudentProgress> getProgress() async {
+    final json = await _get('progress');
+    return StudentProgress.fromJson(_object(json, 'progress'));
   }
 
   Future<Map<String, Object?>> _get(String path) async {
     final response = await _client.get(_baseUri.resolve(path));
+    final json = _decode(response);
+    _throwWhenFailed(response, json);
+    return json;
+  }
+
+  Future<Map<String, Object?>> _post(
+    String path,
+    Map<String, Object?> body,
+  ) async {
+    final response = await _client.post(
+      _baseUri.resolve(path),
+      headers: const {'content-type': 'application/json; charset=utf-8'},
+      body: jsonEncode(body),
+    );
     final json = _decode(response);
     _throwWhenFailed(response, json);
     return json;

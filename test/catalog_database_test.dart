@@ -22,13 +22,17 @@ void main() {
 
   test('crea el esquema y siembra el catálogo sin duplicados', () async {
     var catalog = CatalogDatabase.open(databasePath);
-    expect(_count(catalog, 'schema_migrations'), 1);
+    expect(_count(catalog, 'schema_migrations'), 2);
     expect(_count(catalog, 'worlds'), 2);
     expect(_count(catalog, 'topics'), 9);
     expect(_count(catalog, 'missions'), 9);
     expect(_count(catalog, 'mission_context_paragraphs'), 18);
     expect(_count(catalog, 'mission_instructions'), 27);
     expect(_count(catalog, 'mission_options'), 27);
+    expect(_count(catalog, 'users'), 0);
+    expect(_count(catalog, 'sessions'), 0);
+    expect(_count(catalog, 'training_attempts'), 0);
+    expect(_count(catalog, 'mission_progress'), 0);
     expect(
       catalog.database.select('''
         SELECT mission_id
@@ -45,7 +49,7 @@ void main() {
     catalog.close();
 
     catalog = CatalogDatabase.open(databasePath);
-    expect(_count(catalog, 'schema_migrations'), 1);
+    expect(_count(catalog, 'schema_migrations'), 2);
     expect(_count(catalog, 'worlds'), 2);
     expect(_count(catalog, 'topics'), 9);
     expect(_count(catalog, 'missions'), 9);
@@ -53,7 +57,7 @@ void main() {
     catalog.close();
   });
 
-  test('consulta contenido ordenado y valida respuestas en SQLite', () async {
+  test('consulta contenido ordenado y conserva integridad en SQLite', () async {
     final catalog = CatalogDatabase.open(databasePath);
     addTearDown(catalog.close);
     final repository = SqliteCatalogRepository(catalog.database);
@@ -73,18 +77,6 @@ void main() {
     }
 
     expect(
-      (await repository.checkMissionAnswer('w1_m1', 'int')).isCorrect,
-      isTrue,
-    );
-    expect(
-      (await repository.checkMissionAnswer('w1_m1', 'double')).isCorrect,
-      isFalse,
-    );
-    expect(
-      () => repository.checkMissionAnswer('w1_m1', 'top_right'),
-      throwsA(isA<Exception>()),
-    );
-    expect(
       () => catalog.database.execute(
         'UPDATE missions SET topic_id = ? WHERE id = ?',
         ['flutter_row', 'w1_m1'],
@@ -103,6 +95,10 @@ int _count(CatalogDatabase catalog, String table) {
     'mission_context_paragraphs',
     'mission_instructions',
     'mission_options',
+    'users',
+    'sessions',
+    'training_attempts',
+    'mission_progress',
   };
   if (!allowed.contains(table)) throw ArgumentError.value(table);
   return catalog.database

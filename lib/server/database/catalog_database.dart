@@ -36,12 +36,16 @@ class CatalogDatabase {
       )
     ''');
 
-    final applied = database.select(
-      'SELECT version FROM schema_migrations WHERE version = ?',
-      [1],
-    ).isNotEmpty;
-    if (!applied) _applyMigrationOne();
+    if (!_migrationApplied(1)) _applyMigrationOne();
+    if (!_migrationApplied(2)) _applyMigrationTwo();
     _seedCatalog();
+  }
+
+  bool _migrationApplied(int version) {
+    return database.select(
+      'SELECT version FROM schema_migrations WHERE version = ?',
+      [version],
+    ).isNotEmpty;
   }
 
   void _applyMigrationOne() {
@@ -129,6 +133,78 @@ class CatalogDatabase {
         VALUES (?, ?)
       ''',
         [1, DateTime.now().toUtc().toIso8601String()],
+      );
+    });
+  }
+
+  void _applyMigrationTwo() {
+    _transaction(() {
+      database.execute('''
+        CREATE TABLE users (
+          id TEXT PRIMARY KEY,
+          username TEXT NOT NULL,
+          username_normalized TEXT NOT NULL UNIQUE,
+          display_name TEXT NOT NULL,
+          role TEXT NOT NULL CHECK (role IN ('teacher', 'student')),
+          password_algorithm TEXT NOT NULL,
+          password_salt TEXT NOT NULL,
+          password_hash TEXT NOT NULL,
+          password_memory INTEGER NOT NULL,
+          password_iterations INTEGER NOT NULL,
+          password_parallelism INTEGER NOT NULL,
+          created_at TEXT NOT NULL,
+          is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
+        )
+      ''');
+      database.execute('''
+        CREATE TABLE sessions (
+          token_hash TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          created_at TEXT NOT NULL,
+          last_seen_at TEXT NOT NULL,
+          expires_at TEXT NOT NULL
+        )
+      ''');
+      database.execute('''
+        CREATE TABLE training_attempts (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          mission_id TEXT NOT NULL REFERENCES missions(id) ON DELETE RESTRICT,
+          selected_option_id TEXT NOT NULL,
+          is_correct INTEGER NOT NULL CHECK (is_correct IN (0, 1)),
+          hint_used INTEGER NOT NULL CHECK (hint_used IN (0, 1)),
+          attempted_at TEXT NOT NULL,
+          content_version INTEGER NOT NULL,
+          FOREIGN KEY(mission_id, selected_option_id)
+            REFERENCES mission_options(mission_id, id) ON DELETE RESTRICT
+        )
+      ''');
+      database.execute('''
+        CREATE TABLE mission_progress (
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          mission_id TEXT NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
+          completed_at TEXT NOT NULL,
+          last_attempt_at TEXT NOT NULL,
+          PRIMARY KEY(user_id, mission_id)
+        )
+      ''');
+      database.execute(
+        'CREATE INDEX idx_sessions_user ON sessions(user_id, expires_at)',
+      );
+      database.execute('''
+        CREATE INDEX idx_attempts_user_mission
+        ON training_attempts(user_id, mission_id, attempted_at)
+      ''');
+      database.execute('''
+        CREATE INDEX idx_progress_user
+        ON mission_progress(user_id, mission_id)
+      ''');
+      database.execute(
+        '''
+        INSERT INTO schema_migrations(version, applied_at)
+        VALUES (?, ?)
+      ''',
+        [2, DateTime.now().toUtc().toIso8601String()],
       );
     });
   }

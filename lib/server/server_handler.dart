@@ -3,10 +3,8 @@ import 'dart:io';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_static/shelf_static.dart';
 
-import 'api/catalog_api.dart';
-
 Handler createServerHandler({
-  required CatalogApi api,
+  required Handler apiHandler,
   required String webRoot,
 }) {
   final staticHandler = createStaticHandler(
@@ -15,9 +13,7 @@ Handler createServerHandler({
   );
 
   Future<Response> handler(Request request) async {
-    if (request.url.path.startsWith('api/')) {
-      return api.handler(request);
-    }
+    if (request.url.path.startsWith('api/')) return apiHandler(request);
 
     final indexFile = File('$webRoot/index.html');
     if (!indexFile.existsSync()) {
@@ -27,7 +23,6 @@ Handler createServerHandler({
         headers: const {'content-type': 'text/plain; charset=utf-8'},
       );
     }
-
     final response = await staticHandler(request);
     if (response.statusCode != 404) return response;
     return Response.ok(

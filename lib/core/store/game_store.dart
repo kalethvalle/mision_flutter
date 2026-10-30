@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/mission_model.dart';
+import '../models/progress_model.dart';
 import '../models/world_model.dart';
 import '../repositories/catalog_repository.dart';
 
@@ -24,7 +25,8 @@ class GameStore extends ChangeNotifier {
   bool _isSuccess = false;
   bool _showError = false;
   bool _isCheckingAnswer = false;
-  bool _isWorld1Completed = false;
+  bool _hintUsed = false;
+  StudentProgress _progress = const StudentProgress.empty();
   String? _worldsError;
   String? _missionsError;
   int _loadGeneration = 0;
@@ -40,20 +42,24 @@ class GameStore extends ChangeNotifier {
   bool get isSuccess => _isSuccess;
   bool get showError => _showError;
   bool get isCheckingAnswer => _isCheckingAnswer;
+  bool get hintUsed => _hintUsed;
+  StudentProgress get progress => _progress;
+  bool get isCurrentMissionCompleted {
+    final mission = currentMissionOrNull;
+    return mission != null &&
+        (_progress.mission(mission.id)?.isCompleted ?? false);
+  }
 
   List<WorldModel> get worlds {
     return _catalogWorlds
-        .asMap()
-        .entries
-        .map((entry) {
-          final unlocked =
-              entry.key == 0 ||
-              entry.value.id == 'world_1' ||
-              (entry.value.id == 'world_2' && _isWorld1Completed);
-          return entry.value.copyWith(isUnlocked: unlocked);
+        .map((world) {
+          final unlocked = _progress.world(world.id)?.isUnlocked ?? false;
+          return world.copyWith(isUnlocked: unlocked);
         })
         .toList(growable: false);
   }
+
+  WorldProgressState? worldProgress(String worldId) => _progress.world(worldId);
 
   List<MissionModel> get currentWorldMissions {
     final worldId = _selectedWorldId;
@@ -79,8 +85,13 @@ class GameStore extends ChangeNotifier {
 
   int get currentMissionNumber => _currentMissionIndex + 1;
   int get totalMissions => currentWorldMissions.length;
-  bool get hasNextMission =>
-      _currentMissionIndex < currentWorldMissions.length - 1;
+  bool get hasNextMission {
+    final nextIndex = _currentMissionIndex + 1;
+    if (nextIndex >= currentWorldMissions.length) return false;
+    final nextMission = currentWorldMissions[nextIndex];
+    return _progress.mission(nextMission.id)?.isUnlocked ?? false;
+  }
+
   bool get hasPrevMission => _currentMissionIndex > 0;
 
   Future<void> initialize() async {
@@ -89,7 +100,12 @@ class GameStore extends ChangeNotifier {
     _worldsError = null;
     notifyListeners();
     try {
-      _catalogWorlds = await _catalogRepository.listWorlds();
+      final results = await Future.wait<Object>([
+        _catalogRepository.listWorlds(),
+        _catalogRepository.getProgress(),
+      ]);
+      _catalogWorlds = results[0] as List<WorldModel>;
+      _progress = results[1] as StudentProgress;
       _worldsState = _catalogWorlds.isEmpty ? LoadState.empty : LoadState.ready;
     } on Object catch (error) {
       _worldsState = LoadState.failure;
@@ -111,6 +127,7 @@ class GameStore extends ChangeNotifier {
 
     final cached = _missionsByWorld[worldId];
     if (cached != null) {
+      _currentMissionIndex = _initialMissionIndex(cached);
       _missionsState = cached.isEmpty ? LoadState.empty : LoadState.ready;
       notifyListeners();
       return;
@@ -133,6 +150,7 @@ class GameStore extends ChangeNotifier {
       final missions = await _catalogRepository.listWorldMissions(worldId);
       if (generation != _loadGeneration || worldId != _selectedWorldId) return;
       _missionsByWorld[worldId] = missions;
+      _currentMissionIndex = _initialMissionIndex(missions);
       _missionsState = missions.isEmpty ? LoadState.empty : LoadState.ready;
     } on Object catch (error) {
       if (generation != _loadGeneration || worldId != _selectedWorldId) return;
@@ -159,6 +177,12 @@ class GameStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  void markHintUsed() {
+    if (_hintUsed) return;
+    _hintUsed = true;
+    notifyListeners();
+  }
+
   Future<void> checkAnswer() async {
     final mission = currentMissionOrNull;
     final optionId = _selectedOptionId;
@@ -174,6 +198,7 @@ class GameStore extends ChangeNotifier {
       final result = await _catalogRepository.checkMissionAnswer(
         mission.id,
         optionId,
+        hintUsed: _hintUsed,
       );
       if (generation != _answerGeneration ||
           currentMissionOrNull?.id != mission.id ||
@@ -182,10 +207,10 @@ class GameStore extends ChangeNotifier {
       }
       _isSuccess = result.isCorrect;
       _showError = !result.isCorrect;
-      if (result.isCorrect &&
-          _selectedWorldId == 'world_1' &&
-          !hasNextMission) {
-        _isWorld1Completed = true;
+      if (result.progress != null) {
+        _progress = result.progress!;
+      } else if (result.isCorrect) {
+        _progress = await _catalogRepository.getProgress();
       }
     } on Object catch (error) {
       if (generation != _answerGeneration) return;
@@ -217,8 +242,22 @@ class GameStore extends ChangeNotifier {
     _isSuccess = false;
     _showError = false;
     _isCheckingAnswer = false;
+    _hintUsed = false;
     _missionsError = null;
     if (notify) notifyListeners();
+  }
+
+  int _initialMissionIndex(List<MissionModel> missions) {
+    if (missions.isEmpty) return 0;
+    final firstIncomplete = missions.indexWhere((mission) {
+      final state = _progress.mission(mission.id);
+      return state != null && state.isUnlocked && !state.isCompleted;
+    });
+    if (firstIncomplete >= 0) return firstIncomplete;
+    final lastUnlocked = missions.lastIndexWhere(
+      (mission) => _progress.mission(mission.id)?.isUnlocked ?? false,
+    );
+    return lastUnlocked < 0 ? 0 : lastUnlocked;
   }
 
   String _messageFor(Object error) {

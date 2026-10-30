@@ -2,12 +2,11 @@ import 'dart:convert';
 
 import 'package:sqlite3/sqlite3.dart';
 
-import '../../core/models/answer_check_result.dart';
 import '../../core/models/mission_model.dart';
 import '../../core/models/world_model.dart';
 import '../../core/repositories/catalog_repository.dart';
 
-class SqliteCatalogRepository implements FlutterQuestRepository {
+class SqliteCatalogRepository implements CatalogRepository {
   const SqliteCatalogRepository(this._database);
 
   final Database _database;
@@ -155,47 +154,5 @@ class SqliteCatalogRepository implements FlutterQuestRepository {
           );
         })
         .toList();
-  }
-
-  @override
-  Future<AnswerCheckResult> checkMissionAnswer(
-    String missionId,
-    String optionId,
-  ) async {
-    final mission = _database.select(
-      '''
-      SELECT id FROM missions WHERE id = ? AND status = 'published'
-    ''',
-      [missionId],
-    );
-    if (mission.isEmpty) {
-      throw const CatalogException(
-        'mission_not_found',
-        'La misión solicitada no existe o no está publicada.',
-      );
-    }
-
-    final option = _database.select(
-      '''
-      SELECT is_correct
-      FROM mission_options
-      WHERE mission_id = ? AND id = ?
-    ''',
-      [missionId, optionId],
-    );
-    if (option.isEmpty) {
-      throw const CatalogException(
-        'invalid_option',
-        'La opción no pertenece a la misión indicada.',
-      );
-    }
-    final correct = option.single['is_correct'] == 1;
-    return AnswerCheckResult(
-      missionId: missionId,
-      isCorrect: correct,
-      message: correct
-          ? '¡Excelente! Misión completada.'
-          : 'La respuesta no es correcta. Intenta con otra opción.',
-    );
   }
 }
