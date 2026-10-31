@@ -28,6 +28,10 @@ resultado.
   vistas previas implementadas.
 - Banco versionado de preguntas de selección única y múltiple, con estados
   borrador/publicado y validación previa a la publicación.
+- Parciales por mundo disponibles tras completar sus misiones, con snapshots de
+  contenido, selección exacta, nota aprobatoria de 80 e intentos ilimitados.
+- Historial estudiantil e informes docentes filtrables que distinguen
+  entrenamiento y parciales por estudiante, mundo y tema.
 
 ## Arquitectura y flujo de datos
 
@@ -37,10 +41,10 @@ resultado.
 - `lib/core/models` contiene contratos Dart puros y serializables.
 - `lib/core/repositories` define los puertos de catálogo, identidad, progreso,
   autoría y respuesta, además del adaptador HTTP usado por Flutter Web.
-- `lib/core/store` administra sesión, carga asíncrona, navegación, selección,
-  feedback y la vista del progreso persistido.
-- `lib/application` contiene casos de uso de catálogo, identidad, progreso y
-  autoría con validaciones de publicación.
+- `lib/core/store` administra sesión, navegación, progreso, autoría, parciales
+  e informes mediante estado reactivo.
+- `lib/application` contiene casos de uso de catálogo, identidad, progreso,
+  autoría, parciales e informes con autorización por rol.
 - `lib/server` contiene API Shelf, migraciones, semilla y repositorios SQLite.
 - `bin/server.dart` sirve `build/web` y `/api/v1` desde el mismo origen.
 - `lib/features/home/view` presenta el mapa de mundos y la experiencia de cada
@@ -76,13 +80,14 @@ actualiza el store y `notifyListeners()` reconstruye la interfaz.
 | [`catalog-foundation`](./catalog-foundation/spec.md) | 2026-10-27 | Catálogo persistente con migración y semilla idempotente, nueve temas, API local, comprobación segura de respuestas, adaptadores SQLite/HTTP y entrega de Flutter Web desde el mismo origen. Consulta el [plan ejecutado](./catalog-foundation/plan.md). |
 | [`identity-progress`](./identity-progress/spec.md) | 2026-10-30 | Bootstrap docente, cuentas estudiantiles, claves Argon2id, sesiones locales, autorización por rol e intentos y progreso secuencial persistidos y aislados por estudiante. Consulta el [plan ejecutado](./identity-progress/plan.md). |
 | [`content-authoring`](./content-authoring/spec.md) | 2026-10-30 | Editor docente de mundos, temas y misiones por plantillas, banco de preguntas single/multiple, borradores persistentes, publicación validada y versiones que conservan el historial de entrenamiento. Consulta el [plan ejecutado](./content-authoring/plan.md). |
+| [`assessments-reports`](./assessments-reports/spec.md) | 2026-10-30 | Jefes finales por mundo con preguntas versionadas, calificación desde 80, revisión posterior, historial repetible e informes docentes filtrados de entrenamiento y parciales. Consulta el [plan ejecutado](./assessments-reports/plan.md). |
 
 ## Deuda técnica conocida
 
 - No hay cambio o recuperación de clave ni edición o desactivación de cuentas.
-- Todavía no existen parciales, calificación, repetición ni informes docentes
-  de desempeño.
 - La autoría no permite eliminar, importar o exportar contenido ni crear nuevos
   tipos de vista previa desde la interfaz.
+- Los informes no incluyen exportación, gráficos agregados ni sincronización
+  con servicios externos.
 - Android aún no tiene adaptador SQLite nativo ni validación en esta fase.
 

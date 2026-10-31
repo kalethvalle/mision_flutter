@@ -5,6 +5,7 @@ import '../../../core/models/user_model.dart';
 import '../../../core/repositories/catalog_repository.dart';
 import '../../../core/store/game_store.dart';
 import '../../../core/store/authoring_store.dart';
+import '../../../core/store/assessment_store.dart';
 import '../../../core/store/session_store.dart';
 import '../../home/view/home_screen.dart';
 import 'teacher_dashboard.dart';
@@ -28,13 +29,27 @@ class SessionGate extends StatelessWidget {
       SessionState.failure => _SessionFailure(message: session.error),
       SessionState.authenticated =>
         session.user?.role == UserRole.teacher
-            ? ChangeNotifierProvider(
-                create: (_) => AuthoringStore(repository)..load(),
+            ? MultiProvider(
+                providers: [
+                  ChangeNotifierProvider(
+                    create: (_) => AuthoringStore(repository)..load(),
+                  ),
+                  ChangeNotifierProvider(
+                    create: (_) => ReportStore(repository)..load(),
+                  ),
+                ],
                 child: const TeacherDashboard(),
               )
-            : ChangeNotifierProvider(
+            : MultiProvider(
                 key: ValueKey(session.user!.id),
-                create: (_) => GameStore(repository)..initialize(),
+                providers: [
+                  ChangeNotifierProvider(
+                    create: (_) => GameStore(repository)..initialize(),
+                  ),
+                  ChangeNotifierProvider(
+                    create: (_) => AssessmentStore(repository)..load(),
+                  ),
+                ],
                 child: const HomeScreen(),
               ),
     };

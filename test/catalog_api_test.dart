@@ -4,10 +4,12 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mision_flutter/application/catalog/catalog_service.dart';
 import 'package:mision_flutter/application/authoring/authoring_service.dart';
+import 'package:mision_flutter/application/assessment/assessment_service.dart';
 import 'package:mision_flutter/application/identity/identity_service.dart';
 import 'package:mision_flutter/application/progress/progress_service.dart';
 import 'package:mision_flutter/server/api/api_security.dart';
 import 'package:mision_flutter/server/api/authoring_api.dart';
+import 'package:mision_flutter/server/api/assessment_api.dart';
 import 'package:mision_flutter/server/api/app_api.dart';
 import 'package:mision_flutter/server/api/catalog_api.dart';
 import 'package:mision_flutter/server/api/identity_api.dart';
@@ -15,6 +17,7 @@ import 'package:mision_flutter/server/api/training_api.dart';
 import 'package:mision_flutter/server/database/catalog_database.dart';
 import 'package:mision_flutter/server/repositories/sqlite_catalog_repository.dart';
 import 'package:mision_flutter/server/repositories/sqlite_authoring_store.dart';
+import 'package:mision_flutter/server/repositories/sqlite_assessment_store.dart';
 import 'package:mision_flutter/server/repositories/sqlite_identity_store.dart';
 import 'package:mision_flutter/server/repositories/sqlite_progress_store.dart';
 import 'package:mision_flutter/server/security/security_service.dart';
@@ -37,6 +40,7 @@ void main() {
     final security = ApiSecurity(identity);
     final progress = SqliteProgressStore(database.database);
     final authoring = SqliteAuthoringStore(database.database);
+    final assessments = SqliteAssessmentStore(database.database);
     api = createApiHandler(
       identityApi: IdentityApi(identityService: identity, security: security),
       catalogApi: CatalogApi(
@@ -50,6 +54,10 @@ void main() {
       ),
       authoringApi: AuthoringApi(
         authoringService: AuthoringService(authoring),
+        security: security,
+      ),
+      assessmentApi: AssessmentApi(
+        assessmentService: AssessmentService(assessments),
         security: security,
       ),
     );
@@ -215,6 +223,111 @@ void main() {
     expect(invalidBody, contains('enunciado'));
     expect(invalidBody, contains('explicación'));
   });
+
+  test(
+    'parcial no filtra solución, entrega una vez y alimenta informe',
+    () async {
+      final teacherCookie = await _bootstrapTeacher(api);
+      final studentCookie = await _createAndLoginStudent(api, teacherCookie);
+      final correctAnswers = {
+        'w1_m1': 'int',
+        'w1_m2': 'final',
+        'w1_m3': 'arrow',
+        'w1_m4': 'List<String>',
+        'w1_m5': 'String?',
+      };
+      for (final entry in correctAnswers.entries) {
+        final response = await api(
+          _post('/api/v1/missions/${entry.key}/check', {
+            'optionId': entry.value,
+            'hintUsed': false,
+          }, cookie: studentCookie),
+        );
+        expect(response.statusCode, 200);
+      }
+      final question = await api(
+        _post('/api/v1/authoring/questions', {
+          'worldId': 'world_1',
+          'topicId': 'dart_numeric_types',
+          'prompt': '¿Qué tipo representa un entero?',
+          'type': 'single',
+          'explanation': 'int representa enteros.',
+          'status': 'published',
+          'contentVersion': 1,
+          'options': [
+            {'id': 'a', 'text': 'int', 'isCorrect': true},
+            {'id': 'b', 'text': 'String', 'isCorrect': false},
+          ],
+        }, cookie: teacherCookie),
+      );
+      expect(question.statusCode, 201);
+
+      final started = await api(
+        _post(
+          '/api/v1/worlds/world_1/assessments',
+          const {},
+          cookie: studentCookie,
+        ),
+      );
+      expect(started.statusCode, 201);
+      final startedBody = await started.readAsString();
+      expect(startedBody, isNot(contains('isCorrect')));
+      expect(startedBody, isNot(contains('explanation')));
+      final attempt =
+          (jsonDecode(startedBody) as Map<String, Object?>)['attempt']!
+              as Map<String, Object?>;
+      final attemptId = attempt['id']! as String;
+      final questionId =
+          ((attempt['questions']! as List<Object?>).single!
+                  as Map<String, Object?>)['id']!
+              as String;
+
+      final submitted = await api(
+        _post('/api/v1/assessments/$attemptId/submit', {
+          'answers': [
+            {
+              'questionId': questionId,
+              'optionIds': ['a'],
+            },
+          ],
+        }, cookie: studentCookie),
+      );
+      expect(submitted.statusCode, 200);
+      final result =
+          (jsonDecode(await submitted.readAsString())
+                  as Map<String, Object?>)['result']!
+              as Map<String, Object?>;
+      expect(result['score'], 100);
+      expect(result['passed'], isTrue);
+      expect(result['reviews'], hasLength(1));
+
+      final repeated = await api(
+        _post('/api/v1/assessments/$attemptId/submit', {
+          'answers': <Object?>[],
+        }, cookie: studentCookie),
+      );
+      expect(repeated.statusCode, 409);
+      expect(
+        (await api(_request('GET', '/api/v1/reports', cookie: studentCookie)))
+            .statusCode,
+        403,
+      );
+      final report = await api(
+        _request(
+          'GET',
+          '/api/v1/reports?worldId=world_1',
+          cookie: teacherCookie,
+        ),
+      );
+      expect(report.statusCode, 200);
+      final reportBody =
+          (jsonDecode(await report.readAsString())
+                  as Map<String, Object?>)['report']!
+              as Map<String, Object?>;
+      expect(reportBody['training'], hasLength(5));
+      expect(reportBody['assessments'], hasLength(1));
+    },
+  );
 }
 
 Future<String> _bootstrapTeacher(Handler api) async {

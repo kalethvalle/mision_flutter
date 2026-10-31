@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/answer_check_result.dart';
+import '../models/assessment_model.dart';
 import '../models/authoring_model.dart';
 import '../models/mission_model.dart';
 import '../models/progress_model.dart';
@@ -166,6 +167,69 @@ class HttpCatalogRepository implements FlutterQuestRepository {
       question.toJson(),
     );
     return AuthoringQuestion.fromJson(_object(json, 'question'));
+  }
+
+  @override
+  Future<AssessmentOverview> getAssessmentOverview() async {
+    final json = await _get('assessments');
+    return AssessmentOverview.fromJson(_object(json, 'overview'));
+  }
+
+  @override
+  Future<AssessmentAttempt> startAssessment(String worldId) async {
+    final json = await _post(
+      'worlds/${Uri.encodeComponent(worldId)}/assessments',
+      const {},
+    );
+    return AssessmentAttempt.fromJson(_object(json, 'attempt'));
+  }
+
+  @override
+  Future<AssessmentAttempt> getAssessmentAttempt(String attemptId) async {
+    final json = await _get('assessments/${Uri.encodeComponent(attemptId)}');
+    return AssessmentAttempt.fromJson(_object(json, 'attempt'));
+  }
+
+  @override
+  Future<AssessmentResult> submitAssessment(
+    String attemptId,
+    Map<String, List<String>> answers,
+  ) async {
+    final json = await _post(
+      'assessments/${Uri.encodeComponent(attemptId)}/submit',
+      {
+        'answers': answers.entries
+            .map((entry) => {'questionId': entry.key, 'optionIds': entry.value})
+            .toList(),
+      },
+    );
+    return AssessmentResult.fromJson(_object(json, 'result'));
+  }
+
+  @override
+  Future<AssessmentResult> getAssessmentResult(String attemptId) async {
+    final json = await _get(
+      'assessments/${Uri.encodeComponent(attemptId)}/result',
+    );
+    return AssessmentResult.fromJson(_object(json, 'result'));
+  }
+
+  @override
+  Future<TeacherReport> getTeacherReport({
+    String? studentId,
+    String? worldId,
+    String? topicId,
+  }) async {
+    final query = <String, String>{
+      if (studentId != null && studentId.isNotEmpty) 'studentId': studentId,
+      if (worldId != null && worldId.isNotEmpty) 'worldId': worldId,
+      if (topicId != null && topicId.isNotEmpty) 'topicId': topicId,
+    };
+    final uri = _baseUri.resolve('reports').replace(queryParameters: query);
+    final response = await _client.get(uri);
+    final json = _decode(response);
+    _throwWhenFailed(response, json);
+    return TeacherReport.fromJson(_object(json, 'report'));
   }
 
   Future<Map<String, Object?>> _get(String path) async {

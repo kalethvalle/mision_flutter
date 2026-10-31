@@ -39,6 +39,7 @@ class CatalogDatabase {
     if (!_migrationApplied(1)) _applyMigrationOne();
     if (!_migrationApplied(2)) _applyMigrationTwo();
     if (!_migrationApplied(3)) _applyMigrationThree();
+    if (!_migrationApplied(4)) _applyMigrationFour();
     _seedCatalog();
   }
 
@@ -255,6 +256,85 @@ class CatalogDatabase {
         VALUES (?, ?)
       ''',
         [3, DateTime.now().toUtc().toIso8601String()],
+      );
+    });
+  }
+
+  void _applyMigrationFour() {
+    _transaction(() {
+      database.execute('''
+        CREATE TABLE assessment_attempts (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          world_id TEXT NOT NULL REFERENCES worlds(id) ON DELETE RESTRICT,
+          status TEXT NOT NULL CHECK (status IN ('open', 'submitted')),
+          started_at TEXT NOT NULL,
+          submitted_at TEXT,
+          score INTEGER CHECK (score BETWEEN 0 AND 100),
+          passed INTEGER CHECK (passed IN (0, 1)),
+          correct_answers INTEGER,
+          total_questions INTEGER NOT NULL CHECK (total_questions > 0)
+        )
+      ''');
+      database.execute('''
+        CREATE UNIQUE INDEX idx_assessment_open
+        ON assessment_attempts(user_id, world_id)
+        WHERE status = 'open'
+      ''');
+      database.execute('''
+        CREATE INDEX idx_assessment_history
+        ON assessment_attempts(user_id, submitted_at)
+      ''');
+      database.execute('''
+        CREATE TABLE assessment_attempt_questions (
+          attempt_id TEXT NOT NULL
+            REFERENCES assessment_attempts(id) ON DELETE CASCADE,
+          question_id TEXT NOT NULL,
+          position INTEGER NOT NULL,
+          topic_id TEXT NOT NULL,
+          topic_title TEXT NOT NULL,
+          prompt TEXT NOT NULL,
+          question_type TEXT NOT NULL
+            CHECK (question_type IN ('single', 'multiple')),
+          explanation TEXT NOT NULL,
+          content_version INTEGER NOT NULL,
+          PRIMARY KEY(attempt_id, question_id),
+          UNIQUE(attempt_id, position)
+        )
+      ''');
+      database.execute('''
+        CREATE TABLE assessment_attempt_options (
+          attempt_id TEXT NOT NULL,
+          question_id TEXT NOT NULL,
+          option_id TEXT NOT NULL,
+          text TEXT NOT NULL,
+          sort_order INTEGER NOT NULL,
+          is_correct INTEGER NOT NULL CHECK (is_correct IN (0, 1)),
+          PRIMARY KEY(attempt_id, question_id, option_id),
+          UNIQUE(attempt_id, question_id, sort_order),
+          FOREIGN KEY(attempt_id, question_id)
+            REFERENCES assessment_attempt_questions(attempt_id, question_id)
+            ON DELETE CASCADE
+        )
+      ''');
+      database.execute('''
+        CREATE TABLE assessment_answers (
+          attempt_id TEXT NOT NULL,
+          question_id TEXT NOT NULL,
+          option_id TEXT NOT NULL,
+          PRIMARY KEY(attempt_id, question_id, option_id),
+          FOREIGN KEY(attempt_id, question_id, option_id)
+            REFERENCES assessment_attempt_options(
+              attempt_id, question_id, option_id
+            ) ON DELETE RESTRICT
+        )
+      ''');
+      database.execute(
+        '''
+        INSERT INTO schema_migrations(version, applied_at)
+        VALUES (?, ?)
+      ''',
+        [4, DateTime.now().toUtc().toIso8601String()],
       );
     });
   }

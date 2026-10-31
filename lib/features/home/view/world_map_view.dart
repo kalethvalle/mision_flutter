@@ -3,17 +3,34 @@ import 'package:provider/provider.dart';
 
 import '../../../core/models/world_model.dart';
 import '../../../core/models/progress_model.dart';
+import '../../../core/models/assessment_model.dart';
+import '../../../core/store/assessment_store.dart';
 import '../../../core/store/game_store.dart';
 import '../../../core/store/session_store.dart';
 import '../presentation/catalog_presentation_registry.dart';
+import 'assessment_view.dart';
 
-class WorldMapView extends StatelessWidget {
+class WorldMapView extends StatefulWidget {
   const WorldMapView({super.key});
+
+  @override
+  State<WorldMapView> createState() => _WorldMapViewState();
+}
+
+class _WorldMapViewState extends State<WorldMapView> {
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(
+      () => mounted ? context.read<AssessmentStore>().load() : null,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final store = context.watch<GameStore>();
     final session = context.watch<SessionStore>();
+    final assessments = context.watch<AssessmentStore>();
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
@@ -34,6 +51,11 @@ class WorldMapView extends StatelessWidget {
           ],
         ),
         actions: [
+          IconButton(
+            onPressed: () => _showHistory(context, assessments),
+            tooltip: 'Historial de parciales',
+            icon: const Icon(Icons.history),
+          ),
           if (MediaQuery.sizeOf(context).width >= 600)
             Center(child: Text(session.user!.displayName)),
           IconButton(
@@ -43,11 +65,11 @@ class WorldMapView extends StatelessWidget {
           ),
         ],
       ),
-      body: SafeArea(child: _bodyFor(store)),
+      body: SafeArea(child: _bodyFor(store, assessments)),
     );
   }
 
-  Widget _bodyFor(GameStore store) {
+  Widget _bodyFor(GameStore store, AssessmentStore assessments) {
     return switch (store.worldsState) {
       LoadState.initial || LoadState.loading => const _CenteredStatus(
         icon: Icons.sync_rounded,
@@ -64,15 +86,62 @@ class WorldMapView extends StatelessWidget {
         icon: Icons.public_off_rounded,
         message: 'No hay mundos publicados todavía.',
       ),
-      LoadState.ready => _WorldList(store: store),
+      LoadState.ready => _WorldList(store: store, assessments: assessments),
     };
+  }
+
+  Future<void> _showHistory(BuildContext context, AssessmentStore store) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Historial de parciales'),
+        content: SizedBox(
+          width: 560,
+          child: store.overview.history.isEmpty
+              ? const Text('Aún no has entregado parciales.')
+              : ListView(
+                  shrinkWrap: true,
+                  children: store.overview.history
+                      .map(
+                        (item) => ListTile(
+                          title: Text(item.worldTitle),
+                          subtitle: Text(
+                            '${item.score}/100 • ${item.passed ? 'APROBADO' : 'NO APROBADO'}',
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () async {
+                            Navigator.pop(dialogContext);
+                            final loaded = await store.showResult(item.id);
+                            if (loaded && context.mounted) {
+                              await Navigator.push<void>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AssessmentView(store: store),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      )
+                      .toList(),
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('CERRAR'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
 class _WorldList extends StatelessWidget {
-  const _WorldList({required this.store});
+  const _WorldList({required this.store, required this.assessments});
 
   final GameStore store;
+  final AssessmentStore assessments;
 
   @override
   Widget build(BuildContext context) {
@@ -104,9 +173,12 @@ class _WorldList extends StatelessWidget {
                 return _WorldLearningCard(
                   world: world,
                   progress: store.worldProgress(world.id),
+                  assessment: assessments.availabilityFor(world.id),
                   onEnter: world.isUnlocked
                       ? () => store.selectWorld(world.id)
                       : null,
+                  onAssessment: () =>
+                      _openAssessment(context, assessments, world.id),
                 );
               },
             ),
@@ -121,12 +193,16 @@ class _WorldLearningCard extends StatelessWidget {
   const _WorldLearningCard({
     required this.world,
     required this.progress,
+    required this.assessment,
     required this.onEnter,
+    required this.onAssessment,
   });
 
   final WorldModel world;
   final WorldProgressState? progress;
+  final AssessmentAvailability? assessment;
   final VoidCallback? onEnter;
+  final VoidCallback onAssessment;
 
   @override
   Widget build(BuildContext context) {
@@ -237,6 +313,27 @@ class _WorldLearningCard extends StatelessWidget {
                   style: const TextStyle(color: Colors.amber, fontSize: 12),
                 ),
               ],
+              const SizedBox(height: 10),
+              Text(
+                assessment?.isAvailable == true
+                    ? 'JEFE FINAL DISPONIBLE • ${assessment!.publishedQuestions} preguntas'
+                    : assessment?.reason ?? 'Consultando jefe final…',
+                style: TextStyle(
+                  color: assessment?.isAvailable == true
+                      ? Colors.amber
+                      : const Color(0xFF94A3B8),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (assessment?.bestScore != null)
+                Text(
+                  'Mejor nota: ${assessment!.bestScore}/100',
+                  style: const TextStyle(
+                    color: Colors.greenAccent,
+                    fontSize: 12,
+                  ),
+                ),
             ],
           );
           final button = ElevatedButton(
@@ -256,6 +353,31 @@ class _WorldLearningCard extends StatelessWidget {
               ),
             ),
           );
+          final assessmentButton = OutlinedButton.icon(
+            onPressed: assessment?.isAvailable == true ? onAssessment : null,
+            icon: const Icon(Icons.sports_martial_arts),
+            label: Text(
+              assessment?.openAttemptId != null
+                  ? 'CONTINUAR JEFE'
+                  : 'JEFE FINAL',
+            ),
+          );
+          final buttons = compact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    button,
+                    const SizedBox(height: 8),
+                    assessmentButton,
+                  ],
+                )
+              : Column(
+                  children: [
+                    button,
+                    const SizedBox(height: 8),
+                    assessmentButton,
+                  ],
+                );
           return Padding(
             padding: const EdgeInsets.all(20),
             child: compact
@@ -271,7 +393,7 @@ class _WorldLearningCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 18),
-                      SizedBox(width: double.infinity, child: button),
+                      SizedBox(width: double.infinity, child: buttons),
                     ],
                   )
                 : Row(
@@ -280,12 +402,29 @@ class _WorldLearningCard extends StatelessWidget {
                       const SizedBox(width: 18),
                       Expanded(child: details),
                       const SizedBox(width: 24),
-                      button,
+                      buttons,
                     ],
                   ),
           );
         },
       ),
+    );
+  }
+}
+
+Future<void> _openAssessment(
+  BuildContext context,
+  AssessmentStore store,
+  String worldId,
+) async {
+  final availability = store.availabilityFor(worldId);
+  final opened = availability?.openAttemptId == null
+      ? await store.start(worldId)
+      : await store.resume(availability!.openAttemptId!);
+  if (opened && context.mounted) {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => AssessmentView(store: store)),
     );
   }
 }
