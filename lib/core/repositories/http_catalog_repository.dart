@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/answer_check_result.dart';
+import '../models/authoring_model.dart';
 import '../models/mission_model.dart';
 import '../models/progress_model.dart';
 import '../models/user_model.dart';
@@ -121,6 +122,52 @@ class HttpCatalogRepository implements FlutterQuestRepository {
     return StudentProgress.fromJson(_object(json, 'progress'));
   }
 
+  @override
+  Future<AuthoringCatalog> getAuthoringCatalog() async {
+    final json = await _get('authoring');
+    return AuthoringCatalog.fromJson(_object(json, 'catalog'));
+  }
+
+  @override
+  Future<AuthoringWorld> saveWorld(AuthoringWorld world) async {
+    final json = await _saveAuthoring(
+      'authoring/worlds',
+      world.id,
+      world.toJson(),
+    );
+    return AuthoringWorld.fromJson(_object(json, 'world'));
+  }
+
+  @override
+  Future<AuthoringTopic> saveTopic(AuthoringTopic topic) async {
+    final json = await _saveAuthoring(
+      'authoring/topics',
+      topic.id,
+      topic.toJson(),
+    );
+    return AuthoringTopic.fromJson(_object(json, 'topic'));
+  }
+
+  @override
+  Future<AuthoringMission> saveMission(AuthoringMission mission) async {
+    final json = await _saveAuthoring(
+      'authoring/missions',
+      mission.id,
+      mission.toJson(),
+    );
+    return AuthoringMission.fromJson(_object(json, 'mission'));
+  }
+
+  @override
+  Future<AuthoringQuestion> saveQuestion(AuthoringQuestion question) async {
+    final json = await _saveAuthoring(
+      'authoring/questions',
+      question.id,
+      question.toJson(),
+    );
+    return AuthoringQuestion.fromJson(_object(json, 'question'));
+  }
+
   Future<Map<String, Object?>> _get(String path) async {
     final response = await _client.get(_baseUri.resolve(path));
     final json = _decode(response);
@@ -133,6 +180,30 @@ class HttpCatalogRepository implements FlutterQuestRepository {
     Map<String, Object?> body,
   ) async {
     final response = await _client.post(
+      _baseUri.resolve(path),
+      headers: const {'content-type': 'application/json; charset=utf-8'},
+      body: jsonEncode(body),
+    );
+    final json = _decode(response);
+    _throwWhenFailed(response, json);
+    return json;
+  }
+
+  Future<Map<String, Object?>> _saveAuthoring(
+    String path,
+    String? id,
+    Map<String, Object?> body,
+  ) {
+    return id == null
+        ? _post(path, body)
+        : _put('$path/${Uri.encodeComponent(id)}', body);
+  }
+
+  Future<Map<String, Object?>> _put(
+    String path,
+    Map<String, Object?> body,
+  ) async {
+    final response = await _client.put(
       _baseUri.resolve(path),
       headers: const {'content-type': 'application/json; charset=utf-8'},
       body: jsonEncode(body),

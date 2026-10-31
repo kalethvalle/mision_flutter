@@ -144,6 +144,53 @@ void main() {
     expect(find.text('Mapa de Mundos'), findsOneWidget);
     expect(find.textContaining('Ana Estudiante'), findsOneWidget);
   });
+
+  testWidgets('docente abre autoría y conserva un borrador de pregunta', (
+    tester,
+  ) async {
+    final repository = TestCatalogRepository(authenticatedUser: testTeacher);
+    await _setViewport(tester, const Size(1100, 900));
+    await tester.pumpWidget(FlutterQuestApp(catalogRepository: repository));
+    await tester.pumpAndSettle();
+
+    expect(find.text('ESTUDIANTES'), findsOneWidget);
+    await tester.tap(find.text('CONTENIDO'));
+    await tester.pumpAndSettle();
+    expect(find.text('Editor de contenido'), findsOneWidget);
+    expect(find.text('NUEVO MUNDO'), findsOneWidget);
+    expect(find.text('NUEVA MISIÓN'), findsOneWidget);
+
+    await tester.tap(find.text('PREGUNTAS'));
+    await tester.pumpAndSettle();
+    expect(find.text('Banco de preguntas'), findsOneWidget);
+    await tester.tap(find.text('NUEVA PREGUNTA'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nueva pregunta'), findsOneWidget);
+    await tester.tap(find.text('GUARDAR'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Preguntas (1)'), findsOneWidget);
+    expect(find.text('Pregunta sin enunciado'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('editor docente se adapta a pantalla móvil', (tester) async {
+    final repository = TestCatalogRepository(authenticatedUser: testTeacher);
+    await _setViewport(tester, const Size(390, 844));
+    await tester.pumpWidget(FlutterQuestApp(catalogRepository: repository));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('CONTENIDO'));
+    await tester.pumpAndSettle();
+    expect(find.text('Editor de contenido'), findsOneWidget);
+    expect(find.text('NUEVO MUNDO'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('NUEVO MUNDO'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nuevo mundo'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _setViewport(WidgetTester tester, Size size) async {

@@ -1,4 +1,5 @@
 import 'package:mision_flutter/core/models/answer_check_result.dart';
+import 'package:mision_flutter/core/models/authoring_model.dart';
 import 'package:mision_flutter/core/models/mission_model.dart';
 import 'package:mision_flutter/core/models/progress_model.dart';
 import 'package:mision_flutter/core/models/user_model.dart';
@@ -24,6 +25,63 @@ class TestCatalogRepository implements FlutterQuestRepository {
   UserModel? _authenticatedUser;
   final List<UserModel> _users;
   final Set<String> completedMissionIds = {};
+  late final List<AuthoringWorld> _authoringWorlds = seedWorlds
+      .map(
+        (world) => AuthoringWorld(
+          id: world.id,
+          title: world.title,
+          description: world.description,
+          iconKey: world.iconKey,
+          colorHex: world.colorHex,
+          sortOrder: world.sortOrder,
+          status: ContentStatus.published,
+        ),
+      )
+      .toList();
+  late final List<AuthoringTopic> _authoringTopics = seedTopics
+      .map(
+        (topic) => AuthoringTopic(
+          id: topic.id,
+          worldId: topic.worldId,
+          title: topic.title,
+          description: topic.description,
+          sortOrder: topic.sortOrder,
+          status: ContentStatus.published,
+        ),
+      )
+      .toList();
+  late final List<AuthoringMission> _authoringMissions = seedMissions
+      .map(
+        (mission) => AuthoringMission(
+          id: mission.id,
+          worldId: mission.worldId,
+          topicId: mission.topicId,
+          title: mission.title,
+          description: mission.description,
+          paragraphs: mission.paragraphs,
+          instructions: mission.instructions,
+          hint: mission.hint,
+          category: MissionCategory.fromWireName(mission.category),
+          codeTemplate: mission.codeTemplate,
+          targetPlaceholder: mission.targetPlaceholder,
+          previewType: mission.previewType,
+          sortOrder: mission.sortOrder,
+          status: ContentStatus.published,
+          contentVersion: 1,
+          options: mission.options
+              .map(
+                (option) => AuthoringMissionOption(
+                  id: option.id,
+                  label: option.label,
+                  codeSnippet: option.codeSnippet,
+                  isCorrect: option.isCorrect,
+                ),
+              )
+              .toList(),
+        ),
+      )
+      .toList();
+  final List<AuthoringQuestion> _authoringQuestions = [];
   bool? lastHintUsed;
 
   Map<String, String> get correctOptionIds => {
@@ -250,6 +308,109 @@ class TestCatalogRepository implements FlutterQuestRepository {
       previousWorldComplete = completedCount == worldMissions.length;
     }
     return StudentProgress(worlds: worlds, missions: missions);
+  }
+
+  @override
+  Future<AuthoringCatalog> getAuthoringCatalog() async => AuthoringCatalog(
+    worlds: List.unmodifiable(_authoringWorlds),
+    topics: List.unmodifiable(_authoringTopics),
+    missions: List.unmodifiable(_authoringMissions),
+    questions: List.unmodifiable(_authoringQuestions),
+    previewTypes: const [
+      'dart.variables',
+      'dart.final',
+      'dart.arrow',
+      'dart.lists',
+      'dart.null_safety',
+      'flutter.row',
+      'flutter.column',
+      'flutter.padding',
+      'flutter.stack',
+    ],
+  );
+
+  @override
+  Future<AuthoringWorld> saveWorld(AuthoringWorld world) async {
+    final saved = AuthoringWorld(
+      id: world.id ?? 'world_${_authoringWorlds.length + 1}',
+      title: world.title,
+      description: world.description,
+      iconKey: world.iconKey,
+      colorHex: world.colorHex,
+      sortOrder: world.sortOrder,
+      status: world.status,
+    );
+    _replace(_authoringWorlds, saved.id!, saved, (item) => item.id!);
+    return saved;
+  }
+
+  @override
+  Future<AuthoringTopic> saveTopic(AuthoringTopic topic) async {
+    final saved = AuthoringTopic(
+      id: topic.id ?? 'topic_${_authoringTopics.length + 1}',
+      worldId: topic.worldId,
+      title: topic.title,
+      description: topic.description,
+      sortOrder: topic.sortOrder,
+      status: topic.status,
+    );
+    _replace(_authoringTopics, saved.id!, saved, (item) => item.id!);
+    return saved;
+  }
+
+  @override
+  Future<AuthoringMission> saveMission(AuthoringMission mission) async {
+    final saved = AuthoringMission(
+      id: mission.id ?? 'mission_${_authoringMissions.length + 1}',
+      worldId: mission.worldId,
+      topicId: mission.topicId,
+      title: mission.title,
+      description: mission.description,
+      paragraphs: mission.paragraphs,
+      instructions: mission.instructions,
+      hint: mission.hint,
+      category: mission.category,
+      codeTemplate: mission.codeTemplate,
+      targetPlaceholder: mission.targetPlaceholder,
+      previewType: mission.previewType,
+      sortOrder: mission.sortOrder,
+      status: mission.status,
+      contentVersion: mission.id == null ? 1 : mission.contentVersion + 1,
+      options: mission.options,
+    );
+    _replace(_authoringMissions, saved.id!, saved, (item) => item.id!);
+    return saved;
+  }
+
+  @override
+  Future<AuthoringQuestion> saveQuestion(AuthoringQuestion question) async {
+    final saved = AuthoringQuestion(
+      id: question.id ?? 'question_${_authoringQuestions.length + 1}',
+      worldId: question.worldId,
+      topicId: question.topicId,
+      prompt: question.prompt,
+      type: question.type,
+      explanation: question.explanation,
+      status: question.status,
+      contentVersion: question.id == null ? 1 : question.contentVersion + 1,
+      options: question.options,
+    );
+    _replace(_authoringQuestions, saved.id!, saved, (item) => item.id!);
+    return saved;
+  }
+}
+
+void _replace<T>(
+  List<T> items,
+  String id,
+  T value,
+  String Function(T item) idOf,
+) {
+  final index = items.indexWhere((item) => idOf(item) == id);
+  if (index < 0) {
+    items.add(value);
+  } else {
+    items[index] = value;
   }
 }
 

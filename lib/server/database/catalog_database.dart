@@ -38,6 +38,7 @@ class CatalogDatabase {
 
     if (!_migrationApplied(1)) _applyMigrationOne();
     if (!_migrationApplied(2)) _applyMigrationTwo();
+    if (!_migrationApplied(3)) _applyMigrationThree();
     _seedCatalog();
   }
 
@@ -205,6 +206,55 @@ class CatalogDatabase {
         VALUES (?, ?)
       ''',
         [2, DateTime.now().toUtc().toIso8601String()],
+      );
+    });
+  }
+
+  void _applyMigrationThree() {
+    _transaction(() {
+      database.execute('''
+        ALTER TABLE mission_options
+        ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1
+          CHECK (is_active IN (0, 1))
+      ''');
+      database.execute('''
+        CREATE TABLE questions (
+          id TEXT PRIMARY KEY,
+          world_id TEXT NOT NULL REFERENCES worlds(id) ON DELETE CASCADE,
+          topic_id TEXT NOT NULL,
+          prompt TEXT NOT NULL,
+          question_type TEXT NOT NULL
+            CHECK (question_type IN ('single', 'multiple')),
+          explanation TEXT NOT NULL,
+          status TEXT NOT NULL CHECK (status IN ('draft', 'published')),
+          content_version INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY(topic_id, world_id)
+            REFERENCES topics(id, world_id) ON DELETE RESTRICT
+        )
+      ''');
+      database.execute('''
+        CREATE TABLE question_options (
+          question_id TEXT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+          id TEXT NOT NULL,
+          text TEXT NOT NULL,
+          sort_order INTEGER NOT NULL,
+          is_correct INTEGER NOT NULL CHECK (is_correct IN (0, 1)),
+          PRIMARY KEY(question_id, id),
+          UNIQUE(question_id, sort_order)
+        )
+      ''');
+      database.execute('''
+        CREATE INDEX idx_questions_scope
+        ON questions(world_id, topic_id, status)
+      ''');
+      database.execute(
+        '''
+        INSERT INTO schema_migrations(version, applied_at)
+        VALUES (?, ?)
+      ''',
+        [3, DateTime.now().toUtc().toIso8601String()],
       );
     });
   }

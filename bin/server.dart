@@ -2,15 +2,18 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:mision_flutter/application/catalog/catalog_service.dart';
+import 'package:mision_flutter/application/authoring/authoring_service.dart';
 import 'package:mision_flutter/application/identity/identity_service.dart';
 import 'package:mision_flutter/application/progress/progress_service.dart';
 import 'package:mision_flutter/server/api/api_security.dart';
+import 'package:mision_flutter/server/api/authoring_api.dart';
 import 'package:mision_flutter/server/api/app_api.dart';
 import 'package:mision_flutter/server/api/catalog_api.dart';
 import 'package:mision_flutter/server/api/identity_api.dart';
 import 'package:mision_flutter/server/api/training_api.dart';
 import 'package:mision_flutter/server/database/catalog_database.dart';
 import 'package:mision_flutter/server/repositories/sqlite_catalog_repository.dart';
+import 'package:mision_flutter/server/repositories/sqlite_authoring_store.dart';
 import 'package:mision_flutter/server/repositories/sqlite_identity_store.dart';
 import 'package:mision_flutter/server/repositories/sqlite_progress_store.dart';
 import 'package:mision_flutter/server/server_handler.dart';
@@ -24,6 +27,7 @@ Future<void> main(List<String> arguments) async {
     final catalogRepository = SqliteCatalogRepository(catalogDatabase.database);
     final identityStore = SqliteIdentityStore(catalogDatabase.database);
     final progressStore = SqliteProgressStore(catalogDatabase.database);
+    final authoringStore = SqliteAuthoringStore(catalogDatabase.database);
     final identityService = IdentityService(identityStore);
     final security = ApiSecurity(identityService);
     final apiHandler = createApiHandler(
@@ -38,6 +42,10 @@ Future<void> main(List<String> arguments) async {
       ),
       trainingApi: TrainingApi(
         progressService: ProgressService(progressStore, progressStore),
+        security: security,
+      ),
+      authoringApi: AuthoringApi(
+        authoringService: AuthoringService(authoringStore),
         security: security,
       ),
     );

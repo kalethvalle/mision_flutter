@@ -1,4 +1,5 @@
 import '../models/answer_check_result.dart';
+import '../models/authoring_model.dart';
 import '../models/mission_model.dart';
 import '../models/progress_model.dart';
 import '../models/user_model.dart';
@@ -46,12 +47,25 @@ abstract interface class ProgressRepository {
   Future<StudentProgress> getProgress();
 }
 
+abstract interface class AuthoringRepository {
+  Future<AuthoringCatalog> getAuthoringCatalog();
+
+  Future<AuthoringWorld> saveWorld(AuthoringWorld world);
+
+  Future<AuthoringTopic> saveTopic(AuthoringTopic topic);
+
+  Future<AuthoringMission> saveMission(AuthoringMission mission);
+
+  Future<AuthoringQuestion> saveQuestion(AuthoringQuestion question);
+}
+
 abstract interface class FlutterQuestRepository
     implements
         CatalogRepository,
         MissionAnswerRepository,
         IdentityRepository,
-        ProgressRepository {}
+        ProgressRepository,
+        AuthoringRepository {}
 
 class CatalogException implements Exception {
   const CatalogException(this.code, this.message);

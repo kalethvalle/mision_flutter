@@ -3,15 +3,18 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mision_flutter/application/catalog/catalog_service.dart';
+import 'package:mision_flutter/application/authoring/authoring_service.dart';
 import 'package:mision_flutter/application/identity/identity_service.dart';
 import 'package:mision_flutter/application/progress/progress_service.dart';
 import 'package:mision_flutter/server/api/api_security.dart';
+import 'package:mision_flutter/server/api/authoring_api.dart';
 import 'package:mision_flutter/server/api/app_api.dart';
 import 'package:mision_flutter/server/api/catalog_api.dart';
 import 'package:mision_flutter/server/api/identity_api.dart';
 import 'package:mision_flutter/server/api/training_api.dart';
 import 'package:mision_flutter/server/database/catalog_database.dart';
 import 'package:mision_flutter/server/repositories/sqlite_catalog_repository.dart';
+import 'package:mision_flutter/server/repositories/sqlite_authoring_store.dart';
 import 'package:mision_flutter/server/repositories/sqlite_identity_store.dart';
 import 'package:mision_flutter/server/repositories/sqlite_progress_store.dart';
 import 'package:mision_flutter/server/security/security_service.dart';
@@ -33,6 +36,7 @@ void main() {
     final identity = IdentityService(identityStore);
     final security = ApiSecurity(identity);
     final progress = SqliteProgressStore(database.database);
+    final authoring = SqliteAuthoringStore(database.database);
     api = createApiHandler(
       identityApi: IdentityApi(identityService: identity, security: security),
       catalogApi: CatalogApi(
@@ -42,6 +46,10 @@ void main() {
       ),
       trainingApi: TrainingApi(
         progressService: ProgressService(progress, progress),
+        security: security,
+      ),
+      authoringApi: AuthoringApi(
+        authoringService: AuthoringService(authoring),
         security: security,
       ),
     );
@@ -167,6 +175,45 @@ void main() {
     expect(attempts, hasLength(2));
     expect(attempts.first['hint_used'], 1);
     expect(attempts.last['is_correct'], 1);
+  });
+
+  test('protege autoría y devuelve validaciones de publicación', () async {
+    expect((await api(_request('GET', '/api/v1/authoring'))).statusCode, 401);
+    final teacherCookie = await _bootstrapTeacher(api);
+    final studentCookie = await _createAndLoginStudent(api, teacherCookie);
+    expect(
+      (await api(_request('GET', '/api/v1/authoring', cookie: studentCookie)))
+          .statusCode,
+      403,
+    );
+
+    final catalog = await api(
+      _request('GET', '/api/v1/authoring', cookie: teacherCookie),
+    );
+    expect(catalog.statusCode, 200);
+    final catalogBody =
+        (jsonDecode(await catalog.readAsString())
+                as Map<String, Object?>)['catalog']!
+            as Map<String, Object?>;
+    expect(catalogBody['missions'], hasLength(9));
+    expect(catalogBody['previewTypes'], hasLength(9));
+
+    final invalid = await api(
+      _post('/api/v1/authoring/questions', {
+        'worldId': 'world_1',
+        'topicId': 'dart_numeric_types',
+        'prompt': '',
+        'type': 'single',
+        'explanation': '',
+        'status': 'published',
+        'contentVersion': 1,
+        'options': <Object?>[],
+      }, cookie: teacherCookie),
+    );
+    expect(invalid.statusCode, 422);
+    final invalidBody = await invalid.readAsString();
+    expect(invalidBody, contains('enunciado'));
+    expect(invalidBody, contains('explicación'));
   });
 }
 

@@ -24,6 +24,10 @@ resultado.
   mediante cookie `HttpOnly` con vencimiento de 12 horas.
 - Intentos, uso de pistas, progreso y desbloqueos secuenciales persistidos por
   estudiante en SQLite.
+- Panel docente con autoría de mundos, temas y misiones basadas en las nueve
+  vistas previas implementadas.
+- Banco versionado de preguntas de selección única y múltiple, con estados
+  borrador/publicado y validación previa a la publicación.
 
 ## Arquitectura y flujo de datos
 
@@ -31,11 +35,12 @@ resultado.
 - `lib/app.dart` configura `MaterialApp` y expone `SessionStore`; al autenticar
   un estudiante se crea su `GameStore` aislado.
 - `lib/core/models` contiene contratos Dart puros y serializables.
-- `lib/core/repositories` define los puertos de catálogo, identidad, progreso y
-  respuesta, además del adaptador HTTP usado por Flutter Web.
+- `lib/core/repositories` define los puertos de catálogo, identidad, progreso,
+  autoría y respuesta, además del adaptador HTTP usado por Flutter Web.
 - `lib/core/store` administra sesión, carga asíncrona, navegación, selección,
   feedback y la vista del progreso persistido.
-- `lib/application` contiene casos de uso de catálogo, identidad y progreso.
+- `lib/application` contiene casos de uso de catálogo, identidad, progreso y
+  autoría con validaciones de publicación.
 - `lib/server` contiene API Shelf, migraciones, semilla y repositorios SQLite.
 - `bin/server.dart` sirve `build/web` y `/api/v1` desde el mismo origen.
 - `lib/features/home/view` presenta el mapa de mundos y la experiencia de cada
@@ -70,11 +75,14 @@ actualiza el store y `notifyListeners()` reconstruye la interfaz.
 | [`mission-guidance`](./mission-guidance/spec.md) | 2026-10-27 | Guía pedagógica previa para las nueve misiones, pistas sin respuesta explícita, tarjetas de aprendizaje para ambos mundos y adaptación responsive del mapa y la experiencia de misión. Consulta el [plan ejecutado](./mission-guidance/plan.md). |
 | [`catalog-foundation`](./catalog-foundation/spec.md) | 2026-10-27 | Catálogo persistente con migración y semilla idempotente, nueve temas, API local, comprobación segura de respuestas, adaptadores SQLite/HTTP y entrega de Flutter Web desde el mismo origen. Consulta el [plan ejecutado](./catalog-foundation/plan.md). |
 | [`identity-progress`](./identity-progress/spec.md) | 2026-10-30 | Bootstrap docente, cuentas estudiantiles, claves Argon2id, sesiones locales, autorización por rol e intentos y progreso secuencial persistidos y aislados por estudiante. Consulta el [plan ejecutado](./identity-progress/plan.md). |
+| [`content-authoring`](./content-authoring/spec.md) | 2026-10-30 | Editor docente de mundos, temas y misiones por plantillas, banco de preguntas single/multiple, borradores persistentes, publicación validada y versiones que conservan el historial de entrenamiento. Consulta el [plan ejecutado](./content-authoring/plan.md). |
 
 ## Deuda técnica conocida
 
 - No hay cambio o recuperación de clave ni edición o desactivación de cuentas.
-- Todavía no existe editor de contenido, banco de preguntas, parciales ni
-  informes docentes de desempeño.
+- Todavía no existen parciales, calificación, repetición ni informes docentes
+  de desempeño.
+- La autoría no permite eliminar, importar o exportar contenido ni crear nuevos
+  tipos de vista previa desde la interfaz.
 - Android aún no tiene adaptador SQLite nativo ni validación en esta fase.
 
