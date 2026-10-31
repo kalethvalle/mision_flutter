@@ -44,6 +44,7 @@ Future<Response> guardApi(Future<Response> Function() operation) async {
       'forbidden' => 403,
       'mission_not_found' => 404,
       'bootstrap_completed' || 'username_taken' || 'mission_locked' => 409,
+      'content_conflict' => 409,
       'invalid_credentials' ||
       'invalid_option' ||
       'invalid_json' ||
@@ -51,9 +52,17 @@ Future<Response> guardApi(Future<Response> Function() operation) async {
       'invalid_username' ||
       'invalid_display_name' ||
       'invalid_password' => 400,
+      'validation_failed' || 'invalid_relation' => 422,
+      'world_not_found' || 'topic_not_found' || 'question_not_found' => 404,
       _ => 422,
     };
     return errorResponse(status, error.code, error.message);
+  } on FormatException {
+    return errorResponse(
+      400,
+      'invalid_json',
+      'La estructura enviada no es válida.',
+    );
   } on Object {
     return errorResponse(
       500,

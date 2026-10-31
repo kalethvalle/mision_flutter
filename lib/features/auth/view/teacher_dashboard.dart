@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/models/user_model.dart';
 import '../../../core/store/session_store.dart';
+import 'authoring_view.dart';
 
 class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
@@ -31,44 +32,43 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
     final students = session.users
         .where((user) => user.role == UserRole.student)
         .toList();
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B),
-        title: Text('Panel docente • ${session.user!.displayName}'),
-        actions: [
-          IconButton(
-            onPressed: session.isSubmitting ? null : session.logout,
-            tooltip: 'Cerrar sesión',
-            icon: const Icon(Icons.logout),
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0F172A),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF1E293B),
+          title: Text('Panel docente • ${session.user!.displayName}'),
+          actions: [
+            IconButton(
+              onPressed: session.isSubmitting ? null : session.logout,
+              tooltip: 'Cerrar sesión',
+              icon: const Icon(Icons.logout),
+            ),
+          ],
+          bottom: const TabBar(
+            isScrollable: true,
+            tabs: [
+              Tab(icon: Icon(Icons.people), text: 'ESTUDIANTES'),
+              Tab(icon: Icon(Icons.edit_note), text: 'CONTENIDO'),
+              Tab(icon: Icon(Icons.quiz), text: 'PREGUNTAS'),
+            ],
           ),
-        ],
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 850;
-          final form = _StudentForm(
-            formKey: _formKey,
-            username: _username,
-            displayName: _displayName,
-            password: _password,
-            onSubmit: _createStudent,
-          );
-          final list = _StudentList(students: students);
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: compact
-                ? Column(children: [form, const SizedBox(height: 24), list])
-                : Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(flex: 4, child: form),
-                      const SizedBox(width: 24),
-                      Expanded(flex: 6, child: list),
-                    ],
-                  ),
-          );
-        },
+        ),
+        body: TabBarView(
+          children: [
+            _StudentsPanel(
+              formKey: _formKey,
+              username: _username,
+              displayName: _displayName,
+              password: _password,
+              students: students,
+              onSubmit: _createStudent,
+            ),
+            const ContentAuthoringView(),
+            const QuestionBankView(),
+          ],
+        ),
       ),
     );
   }
@@ -88,6 +88,52 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
       const SnackBar(content: Text('Estudiante creado correctamente.')),
     );
   }
+}
+
+class _StudentsPanel extends StatelessWidget {
+  const _StudentsPanel({
+    required this.formKey,
+    required this.username,
+    required this.displayName,
+    required this.password,
+    required this.students,
+    required this.onSubmit,
+  });
+
+  final GlobalKey<FormState> formKey;
+  final TextEditingController username;
+  final TextEditingController displayName;
+  final TextEditingController password;
+  final List<UserModel> students;
+  final Future<void> Function() onSubmit;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final compact = constraints.maxWidth < 850;
+      final form = _StudentForm(
+        formKey: formKey,
+        username: username,
+        displayName: displayName,
+        password: password,
+        onSubmit: onSubmit,
+      );
+      final list = _StudentList(students: students);
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: compact
+            ? Column(children: [form, const SizedBox(height: 24), list])
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 4, child: form),
+                  const SizedBox(width: 24),
+                  Expanded(flex: 6, child: list),
+                ],
+              ),
+      );
+    },
+  );
 }
 
 class _StudentForm extends StatelessWidget {

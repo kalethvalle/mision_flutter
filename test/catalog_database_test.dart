@@ -22,7 +22,7 @@ void main() {
 
   test('crea el esquema y siembra el catálogo sin duplicados', () async {
     var catalog = CatalogDatabase.open(databasePath);
-    expect(_count(catalog, 'schema_migrations'), 2);
+    expect(_count(catalog, 'schema_migrations'), 3);
     expect(_count(catalog, 'worlds'), 2);
     expect(_count(catalog, 'topics'), 9);
     expect(_count(catalog, 'missions'), 9);
@@ -33,6 +33,8 @@ void main() {
     expect(_count(catalog, 'sessions'), 0);
     expect(_count(catalog, 'training_attempts'), 0);
     expect(_count(catalog, 'mission_progress'), 0);
+    expect(_count(catalog, 'questions'), 0);
+    expect(_count(catalog, 'question_options'), 0);
     expect(
       catalog.database.select('''
         SELECT mission_id
@@ -49,7 +51,7 @@ void main() {
     catalog.close();
 
     catalog = CatalogDatabase.open(databasePath);
-    expect(_count(catalog, 'schema_migrations'), 2);
+    expect(_count(catalog, 'schema_migrations'), 3);
     expect(_count(catalog, 'worlds'), 2);
     expect(_count(catalog, 'topics'), 9);
     expect(_count(catalog, 'missions'), 9);
@@ -99,6 +101,8 @@ int _count(CatalogDatabase catalog, String table) {
     'sessions',
     'training_attempts',
     'mission_progress',
+    'questions',
+    'question_options',
   };
   if (!allowed.contains(table)) throw ArgumentError.value(table);
   return catalog.database

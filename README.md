@@ -4,8 +4,8 @@ Aplicación para practicar Dart y Flutter mediante mundos y misiones interactiva
 Incluye dos mundos, nueve temas y nueve misiones. Flutter Web consulta el
 catálogo mediante una API Dart local; el contenido vive en SQLite y la
 comprobación de respuestas ocurre en el servidor. Incluye cuentas locales con
-roles docente/estudiante, sesiones y progreso persistente. El editor docente de
-contenido y los parciales aún no están implementados.
+roles docente/estudiante, sesiones, progreso persistente y autoría de contenido
+por plantillas. Los parciales y sus informes aún no están implementados.
 
 La [planificación SDD de las 12 historias de usuario](docs/stories-users.md)
 describe la evolución del producto. Las features verificadas se registran en
@@ -30,6 +30,11 @@ En la primera apertura, la aplicación solicita crear el docente inicial. Desde
 su panel se crean las cuentas de estudiantes; cada estudiante inicia sesión y
 conserva de forma independiente sus intentos, misiones completadas y mundos
 desbloqueados. No existen credenciales predeterminadas.
+
+El panel docente separa estudiantes, contenido y preguntas. Permite guardar
+mundos, temas, misiones y preguntas como borrador y publicarlos cuando cumplen
+las validaciones. Las misiones solo pueden usar las vistas previas incluidas en
+la aplicación; no se ejecuta código Dart libre.
 
 El servidor admite configuración explícita:
 
@@ -67,8 +72,8 @@ flutter build web
 ```
 
 Las pruebas cubren migraciones, semilla idempotente, Argon2id, sesiones,
-autorización, aislamiento y recuperación de progreso, las nueve misiones, API,
-contenido pedagógico y presentación responsive.
+autorización, aislamiento y recuperación de progreso, autoría y publicación,
+versiones, banco de preguntas, API y presentación responsive.
 
 ## Preparar Android
 

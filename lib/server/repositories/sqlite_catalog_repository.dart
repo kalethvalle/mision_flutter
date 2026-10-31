@@ -141,7 +141,7 @@ class SqliteCatalogRepository implements CatalogRepository {
           '''
       SELECT id, label, code_snippet
       FROM mission_options
-      WHERE mission_id = ?
+      WHERE mission_id = ? AND is_active = 1
       ORDER BY sort_order
     ''',
           [missionId],
