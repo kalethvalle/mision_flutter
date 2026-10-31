@@ -1,4 +1,5 @@
 import '../models/answer_check_result.dart';
+import '../models/assessment_model.dart';
 import '../models/authoring_model.dart';
 import '../models/mission_model.dart';
 import '../models/progress_model.dart';
@@ -59,13 +60,35 @@ abstract interface class AuthoringRepository {
   Future<AuthoringQuestion> saveQuestion(AuthoringQuestion question);
 }
 
+abstract interface class AssessmentRepository {
+  Future<AssessmentOverview> getAssessmentOverview();
+
+  Future<AssessmentAttempt> startAssessment(String worldId);
+
+  Future<AssessmentAttempt> getAssessmentAttempt(String attemptId);
+
+  Future<AssessmentResult> submitAssessment(
+    String attemptId,
+    Map<String, List<String>> answers,
+  );
+
+  Future<AssessmentResult> getAssessmentResult(String attemptId);
+
+  Future<TeacherReport> getTeacherReport({
+    String? studentId,
+    String? worldId,
+    String? topicId,
+  });
+}
+
 abstract interface class FlutterQuestRepository
     implements
         CatalogRepository,
         MissionAnswerRepository,
         IdentityRepository,
         ProgressRepository,
-        AuthoringRepository {}
+        AuthoringRepository,
+        AssessmentRepository {}
 
 class CatalogException implements Exception {
   const CatalogException(this.code, this.message);

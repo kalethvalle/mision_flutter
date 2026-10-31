@@ -12,11 +12,17 @@ void main() {
 
     expect(find.text('Mapa de Mundos'), findsOneWidget);
     expect(find.text('Mundo 1: Fundamentos de Dart'), findsOneWidget);
-    expect(find.text('Mundo 2: Layouts & Flexbox'), findsOneWidget);
-    expect(find.text('QUÉ APRENDERÁS'), findsNWidgets(2));
+    expect(find.text('QUÉ APRENDERÁS'), findsOneWidget);
     expect(find.text('Tipos numéricos'), findsOneWidget);
-    expect(find.text('Superposición'), findsOneWidget);
     expect(find.text('ENTRAR'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Mundo 2: Layouts & Flexbox'),
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Mundo 2: Layouts & Flexbox'), findsOneWidget);
+    expect(find.text('QUÉ APRENDERÁS'), findsOneWidget);
+    expect(find.text('Superposición'), findsOneWidget);
     expect(find.text('BLOQUEADO'), findsOneWidget);
   });
 
@@ -189,6 +195,79 @@ void main() {
     await tester.tap(find.text('NUEVO MUNDO'));
     await tester.pumpAndSettle();
     expect(find.text('Nuevo mundo'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('estudiante presenta, recibe resultado y conserva historial', (
+    tester,
+  ) async {
+    final repository = TestCatalogRepository()..addPublishedQuestion();
+    repository.completedMissionIds.addAll(
+      repository.missionsFor('world_1').map((mission) => mission.id),
+    );
+    await _setViewport(tester, const Size(900, 900));
+    await tester.pumpWidget(FlutterQuestApp(catalogRepository: repository));
+    await tester.pumpAndSettle();
+
+    expect(find.text('JEFE FINAL'), findsNWidgets(2));
+    await tester.tap(find.text('JEFE FINAL').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Pregunta de prueba'), findsOneWidget);
+    expect(find.text('Explicación de prueba.'), findsNothing);
+
+    await tester.tap(find.text('Correcta'));
+    await tester.tap(find.text('ENTREGAR PARCIAL'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ENTREGAR'));
+    await tester.pumpAndSettle();
+    expect(find.text('¡JEFE SUPERADO!'), findsOneWidget);
+    expect(find.textContaining('100/100'), findsWidgets);
+    expect(find.text('Explicación de prueba.'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Historial de parciales'));
+    await tester.pumpAndSettle();
+    expect(find.text('Historial de parciales'), findsOneWidget);
+    expect(find.text('100/100 • APROBADO'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('docente consulta pestaña de resultados', (tester) async {
+    final repository = TestCatalogRepository(authenticatedUser: testTeacher);
+    await _setViewport(tester, const Size(1100, 900));
+    await tester.pumpWidget(FlutterQuestApp(catalogRepository: repository));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('RESULTADOS'));
+    await tester.pumpAndSettle();
+    expect(find.text('Resultados de aprendizaje'), findsOneWidget);
+    expect(find.textContaining('Entrenamiento (0)'), findsOneWidget);
+    expect(find.textContaining('Parciales (0)'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('parcial se adapta a pantalla móvil', (tester) async {
+    final repository = TestCatalogRepository()..addPublishedQuestion();
+    repository.completedMissionIds.addAll(
+      repository.missionsFor('world_1').map((mission) => mission.id),
+    );
+    await _setViewport(tester, const Size(390, 844));
+    await tester.pumpWidget(FlutterQuestApp(catalogRepository: repository));
+    await tester.pumpAndSettle();
+
+    final bossButton = find.widgetWithText(OutlinedButton, 'JEFE FINAL').first;
+    await tester.scrollUntilVisible(
+      bossButton,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(bossButton);
+    await tester.pumpAndSettle();
+    await tester.tap(bossButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Pregunta de prueba'), findsOneWidget);
+    expect(find.text('ENTREGAR PARCIAL'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

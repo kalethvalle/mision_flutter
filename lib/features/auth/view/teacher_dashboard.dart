@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/models/user_model.dart';
 import '../../../core/store/session_store.dart';
 import 'authoring_view.dart';
+import 'report_view.dart';
 
 class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
@@ -33,7 +34,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
         .where((user) => user.role == UserRole.student)
         .toList();
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         backgroundColor: const Color(0xFF0F172A),
         appBar: AppBar(
@@ -52,6 +53,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
               Tab(icon: Icon(Icons.people), text: 'ESTUDIANTES'),
               Tab(icon: Icon(Icons.edit_note), text: 'CONTENIDO'),
               Tab(icon: Icon(Icons.quiz), text: 'PREGUNTAS'),
+              Tab(icon: Icon(Icons.analytics), text: 'RESULTADOS'),
             ],
           ),
         ),
@@ -67,6 +69,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
             ),
             const ContentAuthoringView(),
             const QuestionBankView(),
+            const ReportView(),
           ],
         ),
       ),

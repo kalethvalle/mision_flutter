@@ -1,4 +1,5 @@
 import 'package:mision_flutter/core/models/answer_check_result.dart';
+import 'package:mision_flutter/core/models/assessment_model.dart';
 import 'package:mision_flutter/core/models/authoring_model.dart';
 import 'package:mision_flutter/core/models/mission_model.dart';
 import 'package:mision_flutter/core/models/progress_model.dart';
@@ -82,6 +83,10 @@ class TestCatalogRepository implements FlutterQuestRepository {
       )
       .toList();
   final List<AuthoringQuestion> _authoringQuestions = [];
+  AssessmentAttempt? _openAssessment;
+  final List<AssessmentHistoryItem> _assessmentHistory = [];
+  final Map<String, AssessmentResult> _assessmentResults = {};
+  final Map<String, Set<String>> _assessmentCorrect = {};
   bool? lastHintUsed;
 
   Map<String, String> get correctOptionIds => {
@@ -398,6 +403,243 @@ class TestCatalogRepository implements FlutterQuestRepository {
     _replace(_authoringQuestions, saved.id!, saved, (item) => item.id!);
     return saved;
   }
+
+  void addPublishedQuestion({
+    String id = 'question_1',
+    String worldId = 'world_1',
+    String topicId = 'dart_numeric_types',
+    QuestionType type = QuestionType.single,
+  }) {
+    _authoringQuestions.add(
+      AuthoringQuestion(
+        id: id,
+        worldId: worldId,
+        topicId: topicId,
+        prompt: 'Pregunta de prueba',
+        type: type,
+        explanation: 'Explicación de prueba.',
+        status: ContentStatus.published,
+        contentVersion: 1,
+        options: const [
+          AuthoringQuestionOption(id: 'a', text: 'Correcta', isCorrect: true),
+          AuthoringQuestionOption(
+            id: 'b',
+            text: 'Incorrecta',
+            isCorrect: false,
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Future<AssessmentOverview> getAssessmentOverview() async {
+    final availability = seedWorlds.map((world) {
+      final missions = seedMissions
+          .where((mission) => mission.worldId == world.id)
+          .toList();
+      final completed = missions
+          .where((mission) => completedMissionIds.contains(mission.id))
+          .length;
+      final questions = _authoringQuestions
+          .where(
+            (question) =>
+                question.worldId == world.id &&
+                question.status == ContentStatus.published,
+          )
+          .length;
+      final available = completed == missions.length && questions > 0;
+      return AssessmentAvailability(
+        worldId: world.id,
+        worldTitle: world.title,
+        isAvailable: available,
+        reason: completed < missions.length
+            ? 'Completa todas las misiones publicadas del mundo.'
+            : questions == 0
+            ? 'El docente aún no ha publicado preguntas para este mundo.'
+            : null,
+        publishedQuestions: questions,
+        completedMissions: completed,
+        totalMissions: missions.length,
+        completedAttempts: _assessmentHistory
+            .where((item) => item.worldId == world.id)
+            .length,
+        bestScore: _assessmentHistory
+            .where((item) => item.worldId == world.id)
+            .map((item) => item.score)
+            .fold<int?>(
+              null,
+              (best, score) => best == null || score > best ? score : best,
+            ),
+        openAttemptId: _openAssessment?.worldId == world.id
+            ? _openAssessment?.id
+            : null,
+      );
+    }).toList();
+    return AssessmentOverview(
+      availability: availability,
+      history: List.unmodifiable(_assessmentHistory),
+    );
+  }
+
+  @override
+  Future<AssessmentAttempt> startAssessment(String worldId) async {
+    if (_openAssessment?.worldId == worldId) return _openAssessment!;
+    final overview = await getAssessmentOverview();
+    final availability = overview.availability.singleWhere(
+      (item) => item.worldId == worldId,
+    );
+    if (!availability.isAvailable) {
+      throw CatalogException('assessment_locked', availability.reason!);
+    }
+    final questions = _authoringQuestions
+        .where(
+          (question) =>
+              question.worldId == worldId &&
+              question.status == ContentStatus.published,
+        )
+        .map((question) {
+          _assessmentCorrect[question.id!] = question.options
+              .where((option) => option.isCorrect)
+              .map((option) => option.id)
+              .toSet();
+          final topic = seedTopics.singleWhere(
+            (item) => item.id == question.topicId,
+          );
+          return AssessmentQuestion(
+            id: question.id!,
+            topicId: question.topicId,
+            topicTitle: topic.title,
+            prompt: question.prompt,
+            type: question.type,
+            contentVersion: question.contentVersion,
+            options: question.options
+                .map(
+                  (option) =>
+                      AssessmentOption(id: option.id, text: option.text),
+                )
+                .toList(),
+          );
+        })
+        .toList();
+    final world = seedWorlds.singleWhere((item) => item.id == worldId);
+    _openAssessment = AssessmentAttempt(
+      id: 'attempt_${_assessmentHistory.length + 1}',
+      worldId: worldId,
+      worldTitle: world.title,
+      startedAt: DateTime.utc(2026, 10, 30, 12),
+      questions: questions,
+    );
+    return _openAssessment!;
+  }
+
+  @override
+  Future<AssessmentAttempt> getAssessmentAttempt(String attemptId) async {
+    if (_openAssessment?.id != attemptId) {
+      throw const CatalogException('attempt_not_found', 'Intento inexistente.');
+    }
+    return _openAssessment!;
+  }
+
+  @override
+  Future<AssessmentResult> submitAssessment(
+    String attemptId,
+    Map<String, List<String>> answers,
+  ) async {
+    final attempt = await getAssessmentAttempt(attemptId);
+    final reviews = attempt.questions.map((question) {
+      final selected = answers[question.id] ?? const <String>[];
+      final correct = _assessmentCorrect[question.id] ?? const <String>{};
+      final isCorrect =
+          selected.toSet().length == correct.length &&
+          selected.toSet().containsAll(correct);
+      final source = _authoringQuestions.singleWhere(
+        (item) => item.id == question.id,
+      );
+      return AssessmentReview(
+        questionId: question.id,
+        topicId: question.topicId,
+        prompt: question.prompt,
+        type: question.type,
+        selectedOptionIds: selected,
+        correctOptionIds: correct.toList(),
+        options: question.options,
+        explanation: source.explanation,
+        isCorrect: isCorrect,
+      );
+    }).toList();
+    final correctCount = reviews.where((review) => review.isCorrect).length;
+    final score = (100 * correctCount / reviews.length).round();
+    final submittedAt = DateTime.utc(
+      2026,
+      10,
+      30,
+      12,
+      _assessmentHistory.length + 1,
+    );
+    final topics = <TopicAssessmentScore>[];
+    for (final topicId in reviews.map((review) => review.topicId).toSet()) {
+      final scoped = reviews
+          .where((review) => review.topicId == topicId)
+          .toList();
+      final title = attempt.questions
+          .firstWhere((item) => item.topicId == topicId)
+          .topicTitle;
+      topics.add(
+        TopicAssessmentScore(
+          topicId: topicId,
+          topicTitle: title,
+          correctAnswers: scoped.where((review) => review.isCorrect).length,
+          totalQuestions: scoped.length,
+        ),
+      );
+    }
+    final result = AssessmentResult(
+      attemptId: attemptId,
+      worldId: attempt.worldId,
+      worldTitle: attempt.worldTitle,
+      score: score,
+      passed: score >= 80,
+      correctAnswers: correctCount,
+      totalQuestions: reviews.length,
+      submittedAt: submittedAt,
+      topics: topics,
+      reviews: reviews,
+    );
+    _assessmentResults[attemptId] = result;
+    _assessmentHistory.insert(
+      0,
+      AssessmentHistoryItem(
+        id: attemptId,
+        worldId: attempt.worldId,
+        worldTitle: attempt.worldTitle,
+        startedAt: attempt.startedAt,
+        submittedAt: submittedAt,
+        score: score,
+        passed: result.passed,
+        correctAnswers: correctCount,
+        totalQuestions: reviews.length,
+      ),
+    );
+    _openAssessment = null;
+    return result;
+  }
+
+  @override
+  Future<AssessmentResult> getAssessmentResult(String attemptId) async {
+    final result = _assessmentResults[attemptId];
+    if (result == null) {
+      throw const CatalogException('attempt_not_found', 'Intento inexistente.');
+    }
+    return result;
+  }
+
+  @override
+  Future<TeacherReport> getTeacherReport({
+    String? studentId,
+    String? worldId,
+    String? topicId,
+  }) async => const TeacherReport(training: [], assessments: []);
 }
 
 void _replace<T>(

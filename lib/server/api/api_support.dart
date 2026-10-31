@@ -45,6 +45,9 @@ Future<Response> guardApi(Future<Response> Function() operation) async {
       'mission_not_found' => 404,
       'bootstrap_completed' || 'username_taken' || 'mission_locked' => 409,
       'content_conflict' => 409,
+      'assessment_locked' ||
+      'assessment_unavailable' ||
+      'attempt_submitted' => 409,
       'invalid_credentials' ||
       'invalid_option' ||
       'invalid_json' ||
@@ -53,7 +56,12 @@ Future<Response> guardApi(Future<Response> Function() operation) async {
       'invalid_display_name' ||
       'invalid_password' => 400,
       'validation_failed' || 'invalid_relation' => 422,
-      'world_not_found' || 'topic_not_found' || 'question_not_found' => 404,
+      'invalid_answers' || 'invalid_identifier' => 400,
+      'world_not_found' ||
+      'topic_not_found' ||
+      'question_not_found' ||
+      'attempt_not_found' => 404,
+      'attempt_open' => 409,
       _ => 422,
     };
     return errorResponse(status, error.code, error.message);

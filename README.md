@@ -5,7 +5,8 @@ Incluye dos mundos, nueve temas y nueve misiones. Flutter Web consulta el
 catálogo mediante una API Dart local; el contenido vive en SQLite y la
 comprobación de respuestas ocurre en el servidor. Incluye cuentas locales con
 roles docente/estudiante, sesiones, progreso persistente y autoría de contenido
-por plantillas. Los parciales y sus informes aún no están implementados.
+por plantillas. Cada mundo puede cerrar con un parcial versionado y el docente
+puede consultar resultados de entrenamiento y evaluación.
 
 La [planificación SDD de las 12 historias de usuario](docs/stories-users.md)
 describe la evolución del producto. Las features verificadas se registran en
@@ -35,6 +36,11 @@ El panel docente separa estudiantes, contenido y preguntas. Permite guardar
 mundos, temas, misiones y preguntas como borrador y publicarlos cuando cumplen
 las validaciones. Las misiones solo pueden usar las vistas previas incluidas en
 la aplicación; no se ejecuta código Dart libre.
+
+Al completar todas las misiones de un mundo, el estudiante puede enfrentar su
+«jefe final» si existen preguntas publicadas. La calificación ocurre en el
+servidor, aprueba desde 80/100 y muestra soluciones únicamente después de
+entregar. Los intentos son ilimitados y permanecen en el historial.
 
 El servidor admite configuración explícita:
 
@@ -73,7 +79,8 @@ flutter build web
 
 Las pruebas cubren migraciones, semilla idempotente, Argon2id, sesiones,
 autorización, aislamiento y recuperación de progreso, autoría y publicación,
-versiones, banco de preguntas, API y presentación responsive.
+versiones, banco de preguntas, parciales single/multiple, nota 80, repetición,
+informes filtrados, API y presentación responsive.
 
 ## Preparar Android
 
