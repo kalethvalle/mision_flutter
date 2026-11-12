@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/models/assessment_model.dart';
 import '../../../core/models/authoring_model.dart';
 import '../../../core/store/assessment_store.dart';
+import 'assessment_browser_guard.dart';
 import 'student_theme.dart';
 
 class AssessmentView extends StatelessWidget {
@@ -36,66 +37,229 @@ class AssessmentView extends StatelessWidget {
   );
 }
 
-class _AttemptBody extends StatelessWidget {
+class _AttemptBody extends StatefulWidget {
   const _AttemptBody({required this.store, required this.attempt});
 
   final AssessmentStore store;
   final AssessmentAttempt attempt;
 
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(20),
-    children: [
-      const _AssessmentHeader(
-        icon: Icons.sports_martial_arts,
-        title: 'Jefe final',
-        message: 'Responde todas las preguntas y entrega cuando estés listo. No hay pistas ni límite de tiempo.',
-        color: QuestColors.boss,
+  State<_AttemptBody> createState() => _AttemptBodyState();
+}
+
+class _AttemptBodyState extends State<_AttemptBody> {
+  final _guard = AssessmentBrowserGuard();
+  AssessmentGuardHandle? _handle;
+  bool _ready = false;
+  bool _fullscreenWarning = false;
+
+  @override
+  void dispose() {
+    _handle?.dispose();
+    _guard.unlockKeyboard();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_ready && widget.attempt.settings.fullscreenRequired) {
+      return _StartRulesCard(
+        attempt: widget.attempt,
+        onStart: _enterFullscreen,
+      );
+    }
+    final answered = widget.store.answers.values
+        .where((options) => options.isNotEmpty)
+        .length;
+    return Stack(
+      children: [
+        ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            _AssessmentHeader(
+              icon: Icons.sports_martial_arts,
+              title: 'Jefe final',
+              message:
+                  'Tiempo hasta ${widget.attempt.deadlineAt.toLocal()} • $answered/${widget.attempt.questions.length} respondidas',
+              color: QuestColors.boss,
+            ),
+            const SizedBox(height: 18),
+            ...widget.attempt.questions.asMap().entries.map(
+              (entry) => _QuestionCard(
+                number: entry.key + 1,
+                question: entry.value,
+                selected: widget.store.answers[entry.value.id] ?? const {},
+                onToggle: (optionId) =>
+                    widget.store.toggle(entry.value, optionId),
+              ),
+            ),
+            if (widget.store.error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                widget.store.error!,
+                style: const TextStyle(color: Colors.redAccent),
+              ),
+            ],
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: widget.store.isBusy ? null : _confirmSubmit,
+              icon: const Icon(Icons.flag),
+              label: Text(
+                widget.store.isBusy ? 'Calificando...' : 'Entregar parcial',
+              ),
+            ),
+            const SizedBox(height: 28),
+          ],
+        ),
+        IgnorePointer(
+          child: Opacity(
+            opacity: 0.08,
+            child: Center(
+              child: Transform.rotate(
+                angle: -0.45,
+                child: Text(
+                  widget.attempt.worldTitle,
+                  style: const TextStyle(
+                    fontSize: 42,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (_fullscreenWarning)
+          Positioned.fill(
+            child: ColoredBox(
+              color: Colors.black.withValues(alpha: 0.78),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: QuestCard(
+                    padding: const EdgeInsets.all(22),
+                    borderColor: QuestColors.danger,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.warning,
+                          color: QuestColors.danger,
+                          size: 42,
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Regresa a pantalla completa',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton(
+                          onPressed: _enterFullscreen,
+                          child: const Text('VOLVER'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _enterFullscreen() async {
+    final ok = await _guard.enterFullscreen();
+    await _guard.lockEscape();
+    if (!mounted) return;
+    setState(() {
+      _ready = true;
+      _fullscreenWarning = false;
+    });
+    if (!ok) {
+      await widget.store.recordIncident(
+        'fullscreen_unavailable',
+        'El navegador no permitió pantalla completa.',
+      );
+    }
+    _handle ??= _guard.watch(
+      onIncident: widget.store.recordIncident,
+      onFullscreenExit: () {
+        widget.store.recordIncident(
+          'fullscreen_exit',
+          'Salió de pantalla completa.',
+        );
+        if (mounted) setState(() => _fullscreenWarning = true);
+      },
+    );
+  }
+
+  Future<void> _confirmSubmit() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Entregar parcial'),
+        content: const Text(
+          'Las preguntas sin respuesta contarán como incorrectas y el intento no podrá modificarse.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Entregar'),
+          ),
+        ],
       ),
-      const SizedBox(height: 18),
-      ...attempt.questions.asMap().entries.map(
-        (entry) => _QuestionCard(
-          number: entry.key + 1,
-          question: entry.value,
-          selected: store.answers[entry.value.id] ?? const {},
-          onToggle: (optionId) => store.toggle(entry.value, optionId),
+    );
+    if (confirm == true) await widget.store.submit();
+  }
+}
+
+class _StartRulesCard extends StatelessWidget {
+  const _StartRulesCard({required this.attempt, required this.onStart});
+
+  final AssessmentAttempt attempt;
+  final VoidCallback onStart;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 560),
+      child: QuestCard(
+        padding: const EdgeInsets.all(24),
+        borderColor: QuestColors.boss,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Icon(Icons.fullscreen, color: QuestColors.boss, size: 52),
+            const SizedBox(height: 12),
+            const Text(
+              'Parcial controlado',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Duración: ${attempt.settings.durationMinutes} min. Debes mantener pantalla completa; las salidas o teclas bloqueadas pueden anular el intento.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: QuestColors.muted),
+            ),
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              onPressed: onStart,
+              icon: const Icon(Icons.play_arrow),
+              label: const Text('INICIAR EN PANTALLA COMPLETA'),
+            ),
+          ],
         ),
       ),
-      if (store.error != null) ...[
-        const SizedBox(height: 8),
-        Text(store.error!, style: const TextStyle(color: Colors.redAccent)),
-      ],
-      const SizedBox(height: 16),
-      FilledButton.icon(
-        onPressed: store.isBusy
-            ? null
-            : () async {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Entregar parcial'),
-                    content: const Text(
-                      'Las preguntas sin respuesta contarán como incorrectas y el intento no podrá modificarse.',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancelar'),
-                      ),
-                      FilledButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text('Entregar'),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirm == true) await store.submit();
-              },
-        icon: const Icon(Icons.flag),
-        label: Text(store.isBusy ? 'Calificando...' : 'Entregar parcial'),
-      ),
-      const SizedBox(height: 28),
-    ],
+    ),
   );
 }
 

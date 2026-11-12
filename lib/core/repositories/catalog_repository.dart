@@ -72,6 +72,17 @@ abstract interface class AssessmentRepository {
     Map<String, List<String>> answers,
   );
 
+  Future<void> saveAssessmentDraft(
+    String attemptId,
+    Map<String, List<String>> answers,
+  );
+
+  Future<AssessmentAttempt> recordAssessmentIncident(
+    String attemptId, {
+    required String type,
+    required String message,
+  });
+
   Future<AssessmentResult> getAssessmentResult(String attemptId);
 
   Future<TeacherReport> getTeacherReport({
@@ -79,6 +90,23 @@ abstract interface class AssessmentRepository {
     String? worldId,
     String? topicId,
   });
+
+  Future<AssessmentSessionOverview> getAssessmentSessions();
+
+  Future<AssessmentWorldSettings> saveAssessmentSettings(
+    AssessmentWorldSettings settings,
+  );
+
+  Future<AssessmentSession> openAssessmentSession(String worldId);
+
+  Future<AssessmentSession> closeAssessmentSession(String sessionId);
+
+  Future<AssessmentSession> reactivateAssessmentAttempt(
+    String attemptId, {
+    required String reason,
+  });
+
+  Future<AssessmentDetailReport> getAssessmentDetailReport(String attemptId);
 }
 
 abstract interface class FlutterQuestRepository

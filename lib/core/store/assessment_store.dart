@@ -63,6 +63,9 @@ class AssessmentStore extends ChangeNotifier {
       _attempt = await _repository.getAssessmentAttempt(attemptId);
       _result = null;
       _answers.clear();
+      for (final entry in _attempt!.draftAnswers.entries) {
+        _answers[entry.key] = entry.value.toSet();
+      }
     });
   }
 
@@ -86,6 +89,27 @@ class AssessmentStore extends ChangeNotifier {
       }
     } else if (!selected.add(optionId)) {
       selected.remove(optionId);
+    }
+    notifyListeners();
+    final current = _attempt;
+    if (current != null) {
+      _repository.saveAssessmentDraft(current.id, {
+        for (final entry in _answers.entries) entry.key: entry.value.toList(),
+      });
+    }
+  }
+
+  Future<void> recordIncident(String type, String message) async {
+    final current = _attempt;
+    if (current == null) return;
+    try {
+      _attempt = await _repository.recordAssessmentIncident(
+        current.id,
+        type: type,
+        message: message,
+      );
+    } on Object catch (error) {
+      _error = _messageFor(error);
     }
     notifyListeners();
   }
@@ -134,6 +158,70 @@ class AssessmentStore extends ChangeNotifier {
   }
 }
 
+class AssessmentSessionStore extends ChangeNotifier {
+  AssessmentSessionStore(this._repository);
+
+  final FlutterQuestRepository _repository;
+  AssessmentSessionOverview? _overview;
+  String? _error;
+  bool _loading = false;
+
+  AssessmentSessionOverview? get overview => _overview;
+  String? get error => _error;
+  bool get loading => _loading;
+
+  Future<void> load() async {
+    _loading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      _overview = await _repository.getAssessmentSessions();
+    } on Object catch (error) {
+      _error = error is CatalogException
+          ? error.message
+          : 'No fue posible cargar las sesiones.';
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> saveSettings(AssessmentWorldSettings settings) async {
+    await _run(() => _repository.saveAssessmentSettings(settings));
+  }
+
+  Future<void> open(String worldId) async {
+    await _run(() => _repository.openAssessmentSession(worldId));
+  }
+
+  Future<void> close(String sessionId) async {
+    await _run(() => _repository.closeAssessmentSession(sessionId));
+  }
+
+  Future<void> reactivate(String attemptId, String reason) async {
+    await _run(
+      () => _repository.reactivateAssessmentAttempt(attemptId, reason: reason),
+    );
+  }
+
+  Future<void> _run(Future<Object?> Function() action) async {
+    _loading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      await action();
+      _overview = await _repository.getAssessmentSessions();
+    } on Object catch (error) {
+      _error = error is CatalogException
+          ? error.message
+          : 'No fue posible actualizar el parcial.';
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+}
+
 class ReportStore extends ChangeNotifier {
   ReportStore(this._repository);
 
@@ -146,6 +234,8 @@ class ReportStore extends ChangeNotifier {
   TeacherReport? get report => _report;
   String? get error => _error;
   bool get loading => _loading;
+  AssessmentDetailReport? _detail;
+  AssessmentDetailReport? get detail => _detail;
 
   Future<void> load({
     String? studentId,
@@ -165,6 +255,22 @@ class ReportStore extends ChangeNotifier {
       _error = error is CatalogException
           ? error.message
           : 'No fue posible cargar el informe.';
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadDetail(String attemptId) async {
+    _loading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      _detail = await _repository.getAssessmentDetailReport(attemptId);
+    } on Object catch (error) {
+      _error = error is CatalogException
+          ? error.message
+          : 'No fue posible cargar el detalle.';
     } finally {
       _loading = false;
       notifyListeners();

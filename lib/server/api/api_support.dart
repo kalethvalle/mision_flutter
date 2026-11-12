@@ -47,7 +47,10 @@ Future<Response> guardApi(Future<Response> Function() operation) async {
       'content_conflict' => 409,
       'assessment_locked' ||
       'assessment_unavailable' ||
-      'attempt_submitted' => 409,
+      'assessment_inactive' ||
+      'attempt_submitted' ||
+      'attempt_closed' ||
+      'attempt_annulled' => 409,
       'invalid_credentials' ||
       'invalid_option' ||
       'invalid_json' ||
@@ -60,7 +63,8 @@ Future<Response> guardApi(Future<Response> Function() operation) async {
       'world_not_found' ||
       'topic_not_found' ||
       'question_not_found' ||
-      'attempt_not_found' => 404,
+      'attempt_not_found' ||
+      'session_not_found' => 404,
       'attempt_open' => 409,
       _ => 422,
     };

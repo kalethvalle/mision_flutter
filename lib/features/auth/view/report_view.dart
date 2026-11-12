@@ -176,21 +176,29 @@ class _ReportViewState extends State<ReportView> {
                         leading: CircleAvatar(child: Text('${item.score}')),
                         title: Text('${item.studentName} • ${item.worldTitle}'),
                         subtitle: Text(
-                          item.passed ? 'APROBADO' : 'NO APROBADO',
+                          '${item.status.wireName.toUpperCase()} • ${item.passed ? 'APROBADO' : 'NO APROBADO'} • ${item.incidents} incidentes',
                           style: TextStyle(
                             color: item.passed
                                 ? Colors.greenAccent
                                 : Colors.orangeAccent,
                           ),
                         ),
-                        children: item.topics
-                            .map(
-                              (topic) => ListTile(
-                                title: Text(topic.topicTitle),
-                                trailing: Text('${topic.score}/100'),
-                              ),
-                            )
-                            .toList(),
+                        children: [
+                          ...item.topics.map(
+                            (topic) => ListTile(
+                              title: Text(topic.topicTitle),
+                              trailing: Text('${topic.score}/100'),
+                            ),
+                          ),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: () => _showDetail(context, item.id),
+                              icon: const Icon(Icons.receipt_long),
+                              label: const Text('VER DETALLE'),
+                            ),
+                          ),
+                        ],
                       ),
                     )
                     .toList() ??
@@ -198,6 +206,60 @@ class _ReportViewState extends State<ReportView> {
           ),
         ],
       ],
+    );
+  }
+
+  Future<void> _showDetail(BuildContext context, String attemptId) async {
+    final store = context.read<ReportStore>();
+    await store.loadDetail(attemptId);
+    if (!context.mounted || store.detail == null) return;
+    final detail = store.detail!;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Detalle • ${detail.attempt.studentName}'),
+        content: SizedBox(
+          width: 760,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Nota ${detail.attempt.score}/100 • ${detail.attempt.incidents} incidentes • ${detail.attempt.durationSeconds ~/ 60} min',
+                ),
+                const SizedBox(height: 12),
+                ...detail.questions.map(
+                  (question) => ListTile(
+                    leading: Icon(
+                      question.isCorrect ? Icons.check_circle : Icons.cancel,
+                      color: question.isCorrect
+                          ? Colors.greenAccent
+                          : Colors.redAccent,
+                    ),
+                    title: Text('${question.number}. ${question.prompt}'),
+                    subtitle: Text(
+                      'Respuesta: ${question.selectedOptionTexts.isEmpty ? 'Sin responder' : question.selectedOptionTexts.join(', ')}\nCorrecta: ${question.correctOptionTexts.join(', ')}',
+                    ),
+                  ),
+                ),
+                const Divider(),
+                ...detail.events.map(
+                  (event) => Text(
+                    '${event.occurredAt.toLocal()} • ${event.type}: ${event.message}',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
     );
   }
 }
