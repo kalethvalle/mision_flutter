@@ -261,6 +261,12 @@ void main() {
         }, cookie: teacherCookie),
       );
       expect(question.statusCode, 201);
+      final session = await api(
+        _post('/api/v1/assessment-sessions', {
+          'worldId': 'world_1',
+        }, cookie: teacherCookie),
+      );
+      expect(session.statusCode, 201);
 
       final started = await api(
         _post(

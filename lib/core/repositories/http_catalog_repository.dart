@@ -207,6 +207,34 @@ class HttpCatalogRepository implements FlutterQuestRepository {
   }
 
   @override
+  Future<void> saveAssessmentDraft(
+    String attemptId,
+    Map<String, List<String>> answers,
+  ) async {
+    await _patch(
+      'assessments/${Uri.encodeComponent(attemptId)}/draft-answers',
+      {
+        'answers': answers.entries
+            .map((entry) => {'questionId': entry.key, 'optionIds': entry.value})
+            .toList(),
+      },
+    );
+  }
+
+  @override
+  Future<AssessmentAttempt> recordAssessmentIncident(
+    String attemptId, {
+    required String type,
+    required String message,
+  }) async {
+    final json = await _post(
+      'assessments/${Uri.encodeComponent(attemptId)}/incidents',
+      {'type': type, 'message': message},
+    );
+    return AssessmentAttempt.fromJson(_object(json, 'attempt'));
+  }
+
+  @override
   Future<AssessmentResult> getAssessmentResult(String attemptId) async {
     final json = await _get(
       'assessments/${Uri.encodeComponent(attemptId)}/result',
@@ -232,6 +260,60 @@ class HttpCatalogRepository implements FlutterQuestRepository {
     return TeacherReport.fromJson(_object(json, 'report'));
   }
 
+  @override
+  Future<AssessmentSessionOverview> getAssessmentSessions() async {
+    final json = await _get('assessment-sessions');
+    return AssessmentSessionOverview.fromJson(_object(json, 'overview'));
+  }
+
+  @override
+  Future<AssessmentWorldSettings> saveAssessmentSettings(
+    AssessmentWorldSettings settings,
+  ) async {
+    final json = await _patch(
+      'assessment-sessions/${Uri.encodeComponent(settings.worldId)}/settings',
+      settings.toJson(),
+    );
+    return AssessmentWorldSettings.fromJson(_object(json, 'settings'));
+  }
+
+  @override
+  Future<AssessmentSession> openAssessmentSession(String worldId) async {
+    final json = await _post('assessment-sessions', {'worldId': worldId});
+    return AssessmentSession.fromJson(_object(json, 'session'));
+  }
+
+  @override
+  Future<AssessmentSession> closeAssessmentSession(String sessionId) async {
+    final json = await _post(
+      'assessment-sessions/${Uri.encodeComponent(sessionId)}/close',
+      const {},
+    );
+    return AssessmentSession.fromJson(_object(json, 'session'));
+  }
+
+  @override
+  Future<AssessmentSession> reactivateAssessmentAttempt(
+    String attemptId, {
+    required String reason,
+  }) async {
+    final json = await _post(
+      'assessments/${Uri.encodeComponent(attemptId)}/reactivate',
+      {'reason': reason},
+    );
+    return AssessmentSession.fromJson(_object(json, 'session'));
+  }
+
+  @override
+  Future<AssessmentDetailReport> getAssessmentDetailReport(
+    String attemptId,
+  ) async {
+    final json = await _get(
+      'reports/assessments/${Uri.encodeComponent(attemptId)}',
+    );
+    return AssessmentDetailReport.fromJson(_object(json, 'report'));
+  }
+
   Future<Map<String, Object?>> _get(String path) async {
     final response = await _client.get(_baseUri.resolve(path));
     final json = _decode(response);
@@ -244,6 +326,20 @@ class HttpCatalogRepository implements FlutterQuestRepository {
     Map<String, Object?> body,
   ) async {
     final response = await _client.post(
+      _baseUri.resolve(path),
+      headers: const {'content-type': 'application/json; charset=utf-8'},
+      body: jsonEncode(body),
+    );
+    final json = _decode(response);
+    _throwWhenFailed(response, json);
+    return json;
+  }
+
+  Future<Map<String, Object?>> _patch(
+    String path,
+    Map<String, Object?> body,
+  ) async {
+    final response = await _client.patch(
       _baseUri.resolve(path),
       headers: const {'content-type': 'application/json; charset=utf-8'},
       body: jsonEncode(body),

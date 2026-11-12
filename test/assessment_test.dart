@@ -98,6 +98,7 @@ void main() {
           ),
         );
       }
+      await assessments.openSession(teacher, 'world_1');
 
       final attempt = await assessments.start(student, 'world_1');
       expect(attempt.questions, hasLength(5));
@@ -160,6 +161,7 @@ void main() {
         teacher,
         _question(prompt: 'Múltiple', type: QuestionType.multiple),
       );
+      await assessments.openSession(teacher, 'world_1');
       final attempt = await assessments.start(student, 'world_1');
       final result = await assessments.submit(student, attempt.id, {
         question.id!: ['a'],
@@ -176,6 +178,7 @@ void main() {
       teacher,
       _question(prompt: 'Informe'),
     );
+    await assessments.openSession(teacher, 'world_1');
     final attempt = await assessments.start(student, 'world_1');
     await assessments.submit(student, attempt.id, {
       question.id!: ['a'],
@@ -210,6 +213,78 @@ void main() {
     expect(empty.training, isEmpty);
     expect(empty.assessments, isEmpty);
   });
+
+  test(
+    'sesión activa, incidentes, anulación, reactivación y detalle',
+    () async {
+      await _completeWorldOne(progress, student);
+      final question = await authoring.saveQuestion(
+        teacher,
+        _question(prompt: 'Controlado'),
+      );
+      expect(
+        () => assessments.start(student, 'world_1'),
+        throwsA(_code('assessment_inactive')),
+      );
+      await assessments.saveSettings(
+        teacher,
+        const AssessmentWorldSettings(
+          worldId: 'world_1',
+          durationMinutes: 15,
+          fullscreenRequired: true,
+          maxIncidents: 2,
+          returnGraceSeconds: 10,
+          strictMode: true,
+        ),
+      );
+      final session = await assessments.openSession(teacher, 'world_1');
+      final attempt = await assessments.start(student, 'world_1');
+      await assessments.saveDraftAnswers(student, attempt.id, {
+        question.id!: ['a'],
+      });
+      await assessments.recordIncident(
+        student,
+        attempt.id,
+        type: 'fullscreen_exit',
+        message: 'Salió de pantalla completa.',
+      );
+      expect(
+        () => assessments.recordIncident(
+          student,
+          attempt.id,
+          type: 'fullscreen_exit',
+          message: 'Salió de pantalla completa otra vez.',
+        ),
+        throwsA(_code('attempt_annulled')),
+      );
+
+      final annulled = (await assessments.sessionOverview(teacher)).sessions
+          .singleWhere((item) => item.id == session.id)
+          .attempts
+          .single;
+      expect(annulled.status, AssessmentAttemptStatus.annulled);
+      expect(annulled.incidents, 2);
+
+      await assessments.reactivateAttempt(
+        teacher,
+        attempt.id,
+        reason: 'Validado por el docente.',
+      );
+      final restored = await assessments.loadAttempt(student, attempt.id);
+      expect(restored.draftAnswers[question.id], ['a']);
+      final result = await assessments.submit(student, attempt.id, {
+        question.id!: ['a'],
+      });
+      expect(result.score, 100);
+
+      final detail = await assessments.detailReport(teacher, attempt.id);
+      expect(detail.attempt.reactivationCount, 1);
+      expect(detail.attempt.incidents, 2);
+      expect(detail.questions.single.isCorrect, isTrue);
+      expect(detail.events.map((event) => event.type), contains('reactivated'));
+      await assessments.closeSession(teacher, session.id);
+    },
+  );
 }
 
 Future<void> _completeWorldOne(ProgressService progress, UserModel user) async {

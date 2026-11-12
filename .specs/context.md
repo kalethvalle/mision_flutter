@@ -30,8 +30,12 @@ resultado.
   borrador/publicado y validación previa a la publicación.
 - Parciales por mundo disponibles tras completar sus misiones, con snapshots de
   contenido, selección exacta, nota aprobatoria de 80 e intentos ilimitados.
+- Parciales controlados por sesión docente activa, temporizador sincronizado,
+  pantalla completa best effort, incidentes auditables, anulación estricta,
+  reactivación docente y borradores de respuesta persistidos.
 - Historial estudiantil e informes docentes filtrables que distinguen
-  entrenamiento y parciales por estudiante, mundo y tema.
+  entrenamiento y parciales por estudiante, mundo y tema, con detalle de
+  duración, incidentes, reactivaciones y revisión por pregunta.
 - Experiencia estudiantil separada en Arena de entrenamiento y Cámara del jefe
   final, con navegación clara entre práctica, parciales e historial.
 - Script demo manual para cargar preguntas publicadas de parciales en ambos
@@ -86,6 +90,7 @@ actualiza el store y `notifyListeners()` reconstruye la interfaz.
 | [`content-authoring`](./content-authoring/spec.md) | 2026-10-30 | Editor docente de mundos, temas y misiones por plantillas, banco de preguntas single/multiple, borradores persistentes, publicación validada y versiones que conservan el historial de entrenamiento. Consulta el [plan ejecutado](./content-authoring/plan.md). |
 | [`assessments-reports`](./assessments-reports/spec.md) | 2026-10-30 | Jefes finales por mundo con preguntas versionadas, calificación desde 80, revisión posterior, historial repetible e informes docentes filtrados de entrenamiento y parciales. Consulta el [plan ejecutado](./assessments-reports/plan.md). |
 | [`student-arena-boss-ui`](./student-arena-boss-ui/spec.md) | 2026-11-02 | Rediseño de la experiencia estudiantil en Arena de entrenamiento y Cámara del jefe final, mejora visual de misiones y parciales, y script demo idempotente de preguntas publicadas. Consulta el [plan ejecutado](./student-arena-boss-ui/plan.md). |
+| [`secure-assessment-sessions`](./secure-assessment-sessions/spec.md) | 2026-11-11 | Parciales activados por docente con configuración por mundo, deadline sincronizado, pantalla completa best effort, registro de incidentes, anulación y reactivación, monitoreo docente y reportes detallados por pregunta. Consulta el [plan ejecutado](./secure-assessment-sessions/plan.md). |
 
 ## Deuda técnica conocida
 
@@ -93,6 +98,6 @@ actualiza el store y `notifyListeners()` reconstruye la interfaz.
 - La autoría no permite eliminar, importar o exportar contenido ni crear nuevos
   tipos de vista previa desde la interfaz.
 - Los informes no incluyen exportación, gráficos agregados ni sincronización
-  con servicios externos.
+  con servicios externos; el monitoreo SSE inicial es local al proceso Dart.
 - Android aún no tiene adaptador SQLite nativo ni validación en esta fase.
 

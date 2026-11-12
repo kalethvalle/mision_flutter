@@ -87,6 +87,9 @@ class TestCatalogRepository implements FlutterQuestRepository {
   final List<AssessmentHistoryItem> _assessmentHistory = [];
   final Map<String, AssessmentResult> _assessmentResults = {};
   final Map<String, Set<String>> _assessmentCorrect = {};
+  final Map<String, Map<String, List<String>>> _drafts = {};
+  final Map<String, AssessmentWorldSettings> _settings = {};
+  final List<AssessmentSession> _sessions = [];
   bool? lastHintUsed;
 
   Map<String, String> get correctOptionIds => {
@@ -449,6 +452,9 @@ class TestCatalogRepository implements FlutterQuestRepository {
           )
           .length;
       final available = completed == missions.length && questions > 0;
+      final session = _sessions
+          .where((item) => item.worldId == world.id)
+          .firstOrNull;
       return AssessmentAvailability(
         worldId: world.id,
         worldTitle: world.title,
@@ -471,6 +477,9 @@ class TestCatalogRepository implements FlutterQuestRepository {
               null,
               (best, score) => best == null || score > best ? score : best,
             ),
+        activeSessionId: session?.id ?? 'session_${world.id}',
+        sessionClosesAt: DateTime.utc(2026, 10, 30, 12, 20),
+        durationMinutes: 20,
         openAttemptId: _openAssessment?.worldId == world.id
             ? _openAssessment?.id
             : null,
@@ -528,6 +537,9 @@ class TestCatalogRepository implements FlutterQuestRepository {
       worldId: worldId,
       worldTitle: world.title,
       startedAt: DateTime.utc(2026, 10, 30, 12),
+      deadlineAt: DateTime.utc(2026, 10, 30, 12, 20),
+      settings: _settings[worldId] ?? _testSettings(worldId),
+      draftAnswers: const {},
       questions: questions,
     );
     return _openAssessment!;
@@ -626,6 +638,23 @@ class TestCatalogRepository implements FlutterQuestRepository {
   }
 
   @override
+  Future<void> saveAssessmentDraft(
+    String attemptId,
+    Map<String, List<String>> answers,
+  ) async {
+    _drafts[attemptId] = answers;
+  }
+
+  @override
+  Future<AssessmentAttempt> recordAssessmentIncident(
+    String attemptId, {
+    required String type,
+    required String message,
+  }) async {
+    return getAssessmentAttempt(attemptId);
+  }
+
+  @override
   Future<AssessmentResult> getAssessmentResult(String attemptId) async {
     final result = _assessmentResults[attemptId];
     if (result == null) {
@@ -640,6 +669,71 @@ class TestCatalogRepository implements FlutterQuestRepository {
     String? worldId,
     String? topicId,
   }) async => const TeacherReport(training: [], assessments: []);
+
+  @override
+  Future<AssessmentSessionOverview> getAssessmentSessions() async =>
+      AssessmentSessionOverview(
+        settings: seedWorlds
+            .map((world) => _settings[world.id] ?? _testSettings(world.id))
+            .toList(),
+        sessions: List.unmodifiable(_sessions),
+      );
+
+  @override
+  Future<AssessmentWorldSettings> saveAssessmentSettings(
+    AssessmentWorldSettings settings,
+  ) async {
+    _settings[settings.worldId] = settings;
+    return settings;
+  }
+
+  @override
+  Future<AssessmentSession> openAssessmentSession(String worldId) async {
+    final world = seedWorlds.singleWhere((item) => item.id == worldId);
+    final settings = _settings[worldId] ?? _testSettings(worldId);
+    final session = AssessmentSession(
+      id: 'session_${_sessions.length + 1}',
+      worldId: worldId,
+      worldTitle: world.title,
+      status: AssessmentSessionStatus.open,
+      openedAt: DateTime.utc(2026, 10, 30, 12),
+      closesAt: DateTime.utc(
+        2026,
+        10,
+        30,
+        12,
+      ).add(Duration(minutes: settings.durationMinutes)),
+      durationMinutes: settings.durationMinutes,
+      settings: settings,
+      attempts: const [],
+    );
+    _sessions.insert(0, session);
+    return session;
+  }
+
+  @override
+  Future<AssessmentSession> closeAssessmentSession(String sessionId) async {
+    return _sessions.singleWhere((item) => item.id == sessionId);
+  }
+
+  @override
+  Future<AssessmentSession> reactivateAssessmentAttempt(
+    String attemptId, {
+    required String reason,
+  }) async {
+    return _sessions.first;
+  }
+
+  @override
+  Future<AssessmentDetailReport> getAssessmentDetailReport(
+    String attemptId,
+  ) async {
+    throw const CatalogException('attempt_not_found', 'Intento inexistente.');
+  }
+}
+
+extension _FirstOrNull<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }
 
 void _replace<T>(
@@ -669,3 +763,13 @@ const testStudent = UserModel(
   displayName: 'Estudiante',
   role: UserRole.student,
 );
+
+AssessmentWorldSettings _testSettings(String worldId) =>
+    AssessmentWorldSettings(
+      worldId: worldId,
+      durationMinutes: 20,
+      fullscreenRequired: false,
+      maxIncidents: 2,
+      returnGraceSeconds: 10,
+      strictMode: true,
+    );

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:sqlite3/sqlite3.dart';
 
 import '../../application/assessment/assessment_service.dart';
@@ -17,6 +19,8 @@ class SqliteAssessmentStore implements AssessmentStore {
   final Database _database;
   final SecureTokenService _tokenService;
   final DateTime Function() _clock;
+  final StreamController<AssessmentAttemptEvent> _events =
+      StreamController<AssessmentAttemptEvent>.broadcast();
 
   @override
   Future<AssessmentOverview> overview(String userId) async {
@@ -48,14 +52,21 @@ class SqliteAssessmentStore implements AssessmentStore {
       ''',
         [userId, worldId],
       );
+      final session = _activeSession(worldId);
       final missionsComplete =
           missionCounts.total > 0 &&
           missionCounts.completed == missionCounts.total;
-      final available = missionsComplete && questionCount > 0;
+      final sessionAvailable =
+          session != null &&
+          DateTime.parse(session['closes_at']! as String).isAfter(_clock());
+      final available =
+          missionsComplete && questionCount > 0 && sessionAvailable;
       final reason = !missionsComplete
           ? 'Completa todas las misiones publicadas del mundo.'
           : questionCount == 0
           ? 'El docente aún no ha publicado preguntas para este mundo.'
+          : !sessionAvailable
+          ? 'El docente aún no ha activado el parcial de este mundo.'
           : null;
       return AssessmentAvailability(
         worldId: worldId,
@@ -67,6 +78,11 @@ class SqliteAssessmentStore implements AssessmentStore {
         totalMissions: missionCounts.total,
         completedAttempts: attemptStats['completed_attempts']! as int,
         bestScore: attemptStats['best_score'] as int?,
+        activeSessionId: session?['id'] as String?,
+        sessionClosesAt: session == null
+            ? null
+            : DateTime.parse(session['closes_at']! as String),
+        durationMinutes: session?['duration_minutes'] as int?,
         openAttemptId: open.isEmpty ? null : open.single['id']! as String,
       );
     }).toList();
@@ -115,15 +131,33 @@ class SqliteAssessmentStore implements AssessmentStore {
             'No hay preguntas publicadas para este mundo.',
           );
         }
+        final session = _activeSession(worldId);
+        if (session == null ||
+            !DateTime.parse(session['closes_at']! as String)
+                .isAfter(_clock())) {
+          throw const CatalogException(
+            'assessment_inactive',
+            'El docente debe activar la sesión del parcial.',
+          );
+        }
         attemptId = _tokenService.newId();
         final startedAt = _now();
         _database.execute(
           '''
           INSERT INTO assessment_attempts(
-            id, user_id, world_id, status, started_at, total_questions
-          ) VALUES (?, ?, ?, 'open', ?, ?)
+            id, user_id, world_id, status, session_id, started_at, deadline_at,
+            total_questions
+          ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?)
         ''',
-          [attemptId, userId, worldId, startedAt, questions.length],
+          [
+            attemptId,
+            userId,
+            worldId,
+            session['id'],
+            startedAt,
+            session['closes_at'],
+            questions.length,
+          ],
         );
         for (var index = 0; index < questions.length; index++) {
           final question = questions[index];
@@ -174,6 +208,15 @@ class SqliteAssessmentStore implements AssessmentStore {
             );
           }
         }
+        _recordEvent(
+          session['id']! as String,
+          attemptId: attemptId,
+          userId: userId,
+          type: 'started',
+          message: 'Inició el parcial.',
+          answeredQuestions: 0,
+          totalQuestions: questions.length,
+        );
       }
       _database.execute('COMMIT');
     } on Object {
@@ -202,9 +245,27 @@ class SqliteAssessmentStore implements AssessmentStore {
       );
       if (attemptRows.isEmpty) throw _attemptNotFound;
       if (attemptRows.single['status'] != 'open') {
+        if (attemptRows.single['status'] == 'submitted') {
+          throw const CatalogException(
+            'attempt_submitted',
+            'Este intento ya fue entregado.',
+          );
+        }
         throw const CatalogException(
-          'attempt_submitted',
-          'Este intento ya fue entregado.',
+          'attempt_annulled',
+          'Este intento ya no está abierto.',
+        );
+      }
+      final deadline = attemptRows.single['deadline_at'] as String?;
+      if (deadline != null && !DateTime.parse(deadline).isAfter(_clock())) {
+        _annulAttempt(
+          attemptId,
+          'El tiempo del parcial finalizó.',
+          type: 'expired',
+        );
+        throw const CatalogException(
+          'attempt_annulled',
+          'El tiempo del parcial finalizó.',
         );
       }
       final questions = _database.select(
@@ -281,6 +342,25 @@ class SqliteAssessmentStore implements AssessmentStore {
       ''',
         [_now(), score, score >= 80 ? 1 : 0, correctAnswers, attemptId],
       );
+      _database.execute(
+        'DELETE FROM assessment_draft_answers WHERE attempt_id = ?',
+        [attemptId],
+      );
+      final sessionId = attemptRows.single['session_id'] as String?;
+      if (sessionId != null) {
+        _recordEvent(
+          sessionId,
+          attemptId: attemptId,
+          userId: userId,
+          type: 'submitted',
+          message: 'Entregó el parcial.',
+          answeredQuestions: answers.values
+              .where((items) => items.isNotEmpty)
+              .length,
+          totalQuestions: questions.length,
+          score: score,
+        );
+      }
       _database.execute('COMMIT');
     } on Object {
       _database.execute('ROLLBACK');
@@ -290,8 +370,330 @@ class SqliteAssessmentStore implements AssessmentStore {
   }
 
   @override
+  Future<void> saveDraftAnswers(
+    String userId,
+    String attemptId,
+    Map<String, List<String>> answers,
+  ) async {
+    _database.execute('BEGIN IMMEDIATE');
+    try {
+      final attempt = _openAttemptRow(userId, attemptId);
+      final questions = _database.select(
+        '''
+        SELECT question_id, question_type
+        FROM assessment_attempt_questions
+        WHERE attempt_id = ?
+      ''',
+        [attemptId],
+      );
+      final questionIds = questions
+          .map((row) => row['question_id']! as String)
+          .toSet();
+      if (answers.keys.any((id) => !questionIds.contains(id))) {
+        throw const CatalogException(
+          'invalid_answers',
+          'La respuesta parcial contiene una pregunta ajena al intento.',
+        );
+      }
+      _database.execute(
+        'DELETE FROM assessment_draft_answers WHERE attempt_id = ?',
+        [attemptId],
+      );
+      final now = _now();
+      for (final entry in answers.entries) {
+        final optionRows = _optionRows(attemptId, entry.key);
+        final validIds = optionRows
+            .map((row) => row['option_id']! as String)
+            .toSet();
+        if (entry.value.any((id) => !validIds.contains(id))) {
+          throw const CatalogException(
+            'invalid_answers',
+            'La respuesta parcial contiene una opción ajena al intento.',
+          );
+        }
+        for (final optionId in entry.value.toSet()) {
+          _database.execute(
+            '''
+            INSERT INTO assessment_draft_answers(
+              attempt_id, question_id, option_id, updated_at
+            ) VALUES (?, ?, ?, ?)
+          ''',
+            [attemptId, entry.key, optionId, now],
+          );
+        }
+      }
+      final answered = answers.values.where((items) => items.isNotEmpty).length;
+      final sessionId = attempt['session_id'] as String?;
+      if (sessionId != null) {
+        _recordEvent(
+          sessionId,
+          attemptId: attemptId,
+          userId: userId,
+          type: 'progress',
+          message: 'Actualizó respuestas.',
+          answeredQuestions: answered,
+          totalQuestions: questions.length,
+        );
+      }
+      _database.execute('COMMIT');
+    } on Object {
+      _database.execute('ROLLBACK');
+      rethrow;
+    }
+  }
+
+  @override
+  Future<AssessmentAttempt> recordIncident(
+    String userId,
+    String attemptId, {
+    required String type,
+    required String message,
+  }) async {
+    _database.execute('BEGIN IMMEDIATE');
+    try {
+      final attempt = _openAttemptRow(userId, attemptId);
+      final sessionId = attempt['session_id'] as String?;
+      if (sessionId == null) throw _attemptNotFound;
+      _recordEvent(
+        sessionId,
+        attemptId: attemptId,
+        userId: userId,
+        type: type,
+        message: message,
+        answeredQuestions: _answeredDraftCount(attemptId),
+        totalQuestions: attempt['total_questions']! as int,
+      );
+      final settings = _settingsFor(attempt['world_id']! as String);
+      final incidents = _incidentCount(attemptId);
+      if (settings.strictMode && incidents >= settings.maxIncidents) {
+        _annulAttempt(
+          attemptId,
+          'Superó el límite de incidentes del parcial.',
+          type: 'annulled',
+        );
+      }
+      _database.execute('COMMIT');
+    } on Object {
+      _database.execute('ROLLBACK');
+      rethrow;
+    }
+    return _openAttempt(userId, attemptId);
+  }
+
+  @override
   Future<AssessmentResult> loadResult(String userId, String attemptId) async {
     return _result(userId, attemptId);
+  }
+
+  @override
+  Future<AssessmentSessionOverview> sessionOverview() async {
+    final settings = _database
+        .select('''
+          SELECT s.*, w.title world_title
+          FROM assessment_world_settings s
+          JOIN worlds w ON w.id = s.world_id
+          ORDER BY w.sort_order
+        ''')
+        .map((row) => _settingsFor(row['world_id']! as String))
+        .toList();
+    final sessions = _database
+        .select('''
+          SELECT s.*, w.title world_title
+          FROM assessment_sessions s
+          JOIN worlds w ON w.id = s.world_id
+          ORDER BY s.opened_at DESC
+          LIMIT 12
+        ''')
+        .map(_sessionFromRow)
+        .toList();
+    return AssessmentSessionOverview(settings: settings, sessions: sessions);
+  }
+
+  @override
+  Future<AssessmentWorldSettings> saveSettings(
+    AssessmentWorldSettings settings,
+  ) async {
+    _database.execute(
+      '''
+      INSERT INTO assessment_world_settings(
+        world_id, duration_minutes, fullscreen_required, max_incidents,
+        return_grace_seconds, strict_mode, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(world_id) DO UPDATE SET
+        duration_minutes = excluded.duration_minutes,
+        fullscreen_required = excluded.fullscreen_required,
+        max_incidents = excluded.max_incidents,
+        return_grace_seconds = excluded.return_grace_seconds,
+        strict_mode = excluded.strict_mode,
+        updated_at = excluded.updated_at
+    ''',
+      [
+        settings.worldId,
+        settings.durationMinutes,
+        settings.fullscreenRequired ? 1 : 0,
+        settings.maxIncidents,
+        settings.returnGraceSeconds,
+        settings.strictMode ? 1 : 0,
+        _now(),
+      ],
+    );
+    return _settingsFor(settings.worldId);
+  }
+
+  @override
+  Future<AssessmentSession> openSession(
+    String teacherId,
+    String worldId,
+  ) async {
+    _database.execute('BEGIN IMMEDIATE');
+    late String sessionId;
+    try {
+      final world = _database.select(
+        "SELECT title FROM worlds WHERE id = ? AND status = 'published'",
+        [worldId],
+      );
+      if (world.isEmpty) {
+        throw const CatalogException(
+          'world_not_found',
+          'El mundo no existe o no está publicado.',
+        );
+      }
+      final existing = _activeSession(worldId);
+      if (existing != null) {
+        sessionId = existing['id']! as String;
+      } else {
+        final settings = _settingsFor(worldId);
+        final openedAt = _clock().toUtc();
+        final closesAt = openedAt.add(
+          Duration(minutes: settings.durationMinutes),
+        );
+        sessionId = _tokenService.newId();
+        _database.execute(
+          '''
+          INSERT INTO assessment_sessions(
+            id, world_id, opened_by, status, opened_at, closes_at,
+            duration_minutes, fullscreen_required, max_incidents,
+            return_grace_seconds, strict_mode
+          ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?)
+        ''',
+          [
+            sessionId,
+            worldId,
+            teacherId,
+            openedAt.toIso8601String(),
+            closesAt.toIso8601String(),
+            settings.durationMinutes,
+            settings.fullscreenRequired ? 1 : 0,
+            settings.maxIncidents,
+            settings.returnGraceSeconds,
+            settings.strictMode ? 1 : 0,
+          ],
+        );
+        _recordEvent(
+          sessionId,
+          type: 'session_opened',
+          message: 'El docente activó el parcial.',
+        );
+      }
+      _database.execute('COMMIT');
+    } on Object {
+      _database.execute('ROLLBACK');
+      rethrow;
+    }
+    return _sessionById(sessionId);
+  }
+
+  @override
+  Future<AssessmentSession> closeSession(
+    String teacherId,
+    String sessionId,
+  ) async {
+    _database.execute('BEGIN IMMEDIATE');
+    try {
+      _database.execute(
+        '''
+        UPDATE assessment_sessions
+        SET status = 'closed', closed_at = ?
+        WHERE id = ? AND status = 'open'
+      ''',
+        [_now(), sessionId],
+      );
+      _recordEvent(
+        sessionId,
+        type: 'session_closed',
+        message: 'El docente cerró el parcial.',
+      );
+      _database.execute('COMMIT');
+    } on Object {
+      _database.execute('ROLLBACK');
+      rethrow;
+    }
+    return _sessionById(sessionId);
+  }
+
+  @override
+  Future<AssessmentSession> reactivateAttempt(
+    String teacherId,
+    String attemptId, {
+    required String reason,
+  }) async {
+    _database.execute('BEGIN IMMEDIATE');
+    late String sessionId;
+    try {
+      final rows = _database.select(
+        'SELECT * FROM assessment_attempts WHERE id = ?',
+        [attemptId],
+      );
+      if (rows.isEmpty) throw _attemptNotFound;
+      final row = rows.single;
+      if (row['session_id'] == null) {
+        throw const CatalogException(
+          'assessment_inactive',
+          'Este intento no pertenece a una sesión controlada.',
+        );
+      }
+      sessionId = row['session_id']! as String;
+      _database.execute(
+        '''
+        UPDATE assessment_attempts
+        SET status = 'open', annulled_at = NULL, annulled_reason = NULL,
+          reactivation_count = reactivation_count + 1
+        WHERE id = ?
+      ''',
+        [attemptId],
+      );
+      _recordEvent(
+        sessionId,
+        attemptId: attemptId,
+        userId: row['user_id']! as String,
+        type: 'reactivated',
+        message: reason,
+      );
+      _database.execute('COMMIT');
+    } on Object {
+      _database.execute('ROLLBACK');
+      rethrow;
+    }
+    return _sessionById(sessionId);
+  }
+
+  @override
+  Future<AssessmentDetailReport> detailReport(String attemptId) async {
+    final row = _reportRows(attemptId: attemptId).singleOrNull;
+    if (row == null) throw _attemptNotFound;
+    return AssessmentDetailReport(
+      attempt: _reportItem(row),
+      questions: _questionReports(attemptId),
+      events: _eventsForAttempt(attemptId),
+    );
+  }
+
+  @override
+  Stream<AssessmentAttemptEvent> streamSessionEvents(String sessionId) async* {
+    for (final event in _eventsForSession(sessionId)) {
+      yield event;
+    }
+    yield* _events.stream.where((event) => event.sessionId == sessionId);
   }
 
   @override
@@ -347,7 +749,7 @@ class SqliteAssessmentStore implements AssessmentStore {
         )
         .toList();
 
-    final assessmentWhere = <String>["aa.status = 'submitted'"];
+    final assessmentWhere = <String>["aa.status IN ('submitted', 'annulled')"];
     final assessmentArgs = <Object?>[];
     if (studentId != null) {
       assessmentWhere.add('aa.user_id = ?');
@@ -364,58 +766,109 @@ class SqliteAssessmentStore implements AssessmentStore {
       );
       assessmentArgs.add(topicId);
     }
-    final assessmentRows = _database.select('''
-      SELECT aa.*, u.display_name, w.title world_title
-      FROM assessment_attempts aa
-      JOIN users u ON u.id = aa.user_id
-      JOIN worlds w ON w.id = aa.world_id
-      WHERE ${assessmentWhere.join(' AND ')}
-      ORDER BY aa.submitted_at DESC
-    ''', assessmentArgs);
+    final assessmentRows = _reportRows(
+      whereSql: assessmentWhere.join(' AND '),
+      args: assessmentArgs,
+    );
     final assessments = assessmentRows.map((row) {
-      final id = row['id']! as String;
-      var topics = _topicScores(id);
+      var item = _reportItem(row);
       if (topicId != null) {
-        topics = topics.where((topic) => topic.topicId == topicId).toList();
+        item = AssessmentReportItem(
+          id: item.id,
+          userId: item.userId,
+          studentName: item.studentName,
+          worldId: item.worldId,
+          worldTitle: item.worldTitle,
+          score: item.score,
+          passed: item.passed,
+          status: item.status,
+          startedAt: item.startedAt,
+          deadlineAt: item.deadlineAt,
+          submittedAt: item.submittedAt,
+          durationSeconds: item.durationSeconds,
+          incidents: item.incidents,
+          reactivationCount: item.reactivationCount,
+          topics: item.topics
+              .where((topic) => topic.topicId == topicId)
+              .toList(),
+        );
       }
-      return AssessmentReportItem(
-        id: id,
-        userId: row['user_id']! as String,
-        studentName: row['display_name']! as String,
-        worldId: row['world_id']! as String,
-        worldTitle: row['world_title']! as String,
-        score: row['score']! as int,
-        passed: row['passed'] == 1,
-        submittedAt: DateTime.parse(row['submitted_at']! as String),
-        topics: topics,
-      );
+      return item;
     }).toList();
     return TeacherReport(training: training, assessments: assessments);
   }
 
-  AssessmentAttempt _openAttempt(String userId, String attemptId) {
-    final rows = _database.select(
-      '''
-      SELECT aa.*, w.title world_title
+  ResultSet _reportRows({
+    String whereSql = 'aa.id = ?',
+    List<Object?>? args,
+    String? attemptId,
+  }) {
+    final effectiveArgs = attemptId == null ? (args ?? const []) : [attemptId];
+    return _database.select('''
+      SELECT aa.*, u.display_name, w.title world_title
       FROM assessment_attempts aa
+      JOIN users u ON u.id = aa.user_id
       JOIN worlds w ON w.id = aa.world_id
-      WHERE aa.id = ? AND aa.user_id = ?
-    ''',
-      [attemptId, userId],
+      WHERE $whereSql
+      ORDER BY COALESCE(aa.submitted_at, aa.annulled_at, aa.started_at) DESC
+    ''', effectiveArgs);
+  }
+
+  AssessmentReportItem _reportItem(Row row) {
+    final id = row['id']! as String;
+    final startedAt = DateTime.parse(row['started_at']! as String);
+    final submittedAt = row['submitted_at'] == null
+        ? null
+        : DateTime.parse(row['submitted_at']! as String);
+    final endAt =
+        submittedAt ??
+        (row['annulled_at'] == null
+            ? _clock()
+            : DateTime.parse(row['annulled_at']! as String));
+    return AssessmentReportItem(
+      id: id,
+      userId: row['user_id']! as String,
+      studentName: row['display_name']! as String,
+      worldId: row['world_id']! as String,
+      worldTitle: row['world_title']! as String,
+      score: (row['score'] as int?) ?? 0,
+      passed: row['passed'] == 1,
+      status: AssessmentAttemptStatus.fromWireName(row['status']! as String),
+      startedAt: startedAt,
+      deadlineAt: row['deadline_at'] == null
+          ? startedAt
+          : DateTime.parse(row['deadline_at']! as String),
+      submittedAt: submittedAt,
+      durationSeconds: endAt.difference(startedAt).inSeconds,
+      incidents: _incidentCount(id),
+      reactivationCount: row['reactivation_count']! as int,
+      topics: _topicScores(id),
     );
-    if (rows.isEmpty) throw _attemptNotFound;
-    final row = rows.single;
+  }
+
+  AssessmentAttempt _openAttempt(String userId, String attemptId) {
+    final row = _openAttemptRow(userId, attemptId);
     if (row['status'] != 'open') {
+      if (row['status'] == 'submitted') {
+        throw const CatalogException(
+          'attempt_submitted',
+          'Este intento ya fue entregado.',
+        );
+      }
       throw const CatalogException(
-        'attempt_submitted',
-        'Este intento ya fue entregado.',
+        'attempt_annulled',
+        'Este intento ya no está abierto.',
       );
     }
+    final deadline = row['deadline_at'] as String?;
     return AssessmentAttempt(
       id: attemptId,
       worldId: row['world_id']! as String,
       worldTitle: row['world_title']! as String,
       startedAt: DateTime.parse(row['started_at']! as String),
+      deadlineAt: DateTime.parse(deadline ?? row['started_at']! as String),
+      settings: _settingsFor(row['world_id']! as String),
+      draftAnswers: _draftAnswers(attemptId),
       questions: _database
           .select(
             '''
@@ -439,6 +892,20 @@ class SqliteAssessmentStore implements AssessmentStore {
           )
           .toList(),
     );
+  }
+
+  Row _openAttemptRow(String userId, String attemptId) {
+    final rows = _database.select(
+      '''
+      SELECT aa.*, w.title world_title
+      FROM assessment_attempts aa
+      JOIN worlds w ON w.id = aa.world_id
+      WHERE aa.id = ? AND aa.user_id = ?
+    ''',
+      [attemptId, userId],
+    );
+    if (rows.isEmpty) throw _attemptNotFound;
+    return rows.single;
   }
 
   AssessmentResult _result(String userId, String attemptId) {
@@ -619,6 +1086,333 @@ class SqliteAssessmentStore implements AssessmentStore {
     [worldId],
   );
 
+  Row? _activeSession(String worldId) {
+    final rows = _database.select(
+      '''
+      SELECT * FROM assessment_sessions
+      WHERE world_id = ? AND status = 'open'
+      ORDER BY opened_at DESC
+      LIMIT 1
+    ''',
+      [worldId],
+    );
+    return rows.isEmpty ? null : rows.single;
+  }
+
+  AssessmentWorldSettings _settingsFor(String worldId) {
+    final rows = _database.select(
+      'SELECT * FROM assessment_world_settings WHERE world_id = ?',
+      [worldId],
+    );
+    if (rows.isEmpty) return AssessmentWorldSettings.defaults(worldId);
+    final row = rows.single;
+    return AssessmentWorldSettings(
+      worldId: worldId,
+      durationMinutes: row['duration_minutes']! as int,
+      fullscreenRequired: row['fullscreen_required'] == 1,
+      maxIncidents: row['max_incidents']! as int,
+      returnGraceSeconds: row['return_grace_seconds']! as int,
+      strictMode: row['strict_mode'] == 1,
+    );
+  }
+
+  AssessmentSession _sessionById(String sessionId) {
+    final rows = _database.select(
+      '''
+      SELECT s.*, w.title world_title
+      FROM assessment_sessions s
+      JOIN worlds w ON w.id = s.world_id
+      WHERE s.id = ?
+    ''',
+      [sessionId],
+    );
+    if (rows.isEmpty) {
+      throw const CatalogException(
+        'session_not_found',
+        'La sesión de parcial no existe.',
+      );
+    }
+    return _sessionFromRow(rows.single);
+  }
+
+  AssessmentSession _sessionFromRow(Row row) {
+    final worldId = row['world_id']! as String;
+    final settings = AssessmentWorldSettings(
+      worldId: worldId,
+      durationMinutes: row['duration_minutes']! as int,
+      fullscreenRequired: row['fullscreen_required'] == 1,
+      maxIncidents: row['max_incidents']! as int,
+      returnGraceSeconds: row['return_grace_seconds']! as int,
+      strictMode: row['strict_mode'] == 1,
+    );
+    return AssessmentSession(
+      id: row['id']! as String,
+      worldId: worldId,
+      worldTitle: row['world_title']! as String,
+      status: AssessmentSessionStatus.fromWireName(row['status']! as String),
+      openedAt: DateTime.parse(row['opened_at']! as String),
+      closesAt: DateTime.parse(row['closes_at']! as String),
+      closedAt: row['closed_at'] == null
+          ? null
+          : DateTime.parse(row['closed_at']! as String),
+      durationMinutes: row['duration_minutes']! as int,
+      settings: settings,
+      attempts: _liveAttempts(row['id']! as String),
+    );
+  }
+
+  List<AssessmentLiveAttempt> _liveAttempts(String sessionId) {
+    return _database
+        .select(
+          '''
+          SELECT aa.*, u.display_name
+          FROM assessment_attempts aa
+          JOIN users u ON u.id = aa.user_id
+          WHERE aa.session_id = ?
+          ORDER BY aa.started_at DESC
+        ''',
+          [sessionId],
+        )
+        .map(
+          (row) => AssessmentLiveAttempt(
+            attemptId: row['id']! as String,
+            userId: row['user_id']! as String,
+            studentName: row['display_name']! as String,
+            status: AssessmentAttemptStatus.fromWireName(
+              row['status']! as String,
+            ),
+            startedAt: DateTime.parse(row['started_at']! as String),
+            deadlineAt: DateTime.parse(row['deadline_at']! as String),
+            submittedAt: row['submitted_at'] == null
+                ? null
+                : DateTime.parse(row['submitted_at']! as String),
+            score: row['score'] as int?,
+            answeredQuestions: _answeredDraftCount(row['id']! as String),
+            totalQuestions: row['total_questions']! as int,
+            incidents: _incidentCount(row['id']! as String),
+            reactivationCount: row['reactivation_count']! as int,
+            annulledReason: row['annulled_reason'] as String?,
+          ),
+        )
+        .toList();
+  }
+
+  Map<String, List<String>> _draftAnswers(String attemptId) {
+    final rows = _database.select(
+      '''
+      SELECT question_id, option_id
+      FROM assessment_draft_answers
+      WHERE attempt_id = ?
+      ORDER BY question_id, option_id
+    ''',
+      [attemptId],
+    );
+    final answers = <String, List<String>>{};
+    for (final row in rows) {
+      answers
+          .putIfAbsent(row['question_id']! as String, () => <String>[])
+          .add(row['option_id']! as String);
+    }
+    return answers;
+  }
+
+  int _answeredDraftCount(String attemptId) {
+    return _database
+            .select(
+              '''
+              SELECT COUNT(DISTINCT question_id) AS total
+              FROM assessment_draft_answers
+              WHERE attempt_id = ?
+            ''',
+              [attemptId],
+            )
+            .single['total']!
+        as int;
+  }
+
+  int _incidentCount(String attemptId) {
+    return _database
+            .select(
+              '''
+              SELECT COUNT(*) AS total
+              FROM assessment_attempt_events
+              WHERE attempt_id = ?
+                AND type IN ('fullscreen_exit', 'focus_lost', 'visibility_hidden', 'blocked_key', 'pagehide')
+            ''',
+              [attemptId],
+            )
+            .single['total']!
+        as int;
+  }
+
+  void _annulAttempt(String attemptId, String reason, {required String type}) {
+    final rows = _database.select(
+      'SELECT session_id, user_id FROM assessment_attempts WHERE id = ?',
+      [attemptId],
+    );
+    if (rows.isEmpty) return;
+    _database.execute(
+      '''
+      UPDATE assessment_attempts
+      SET status = 'annulled', annulled_at = ?, annulled_reason = ?
+      WHERE id = ? AND status = 'open'
+    ''',
+      [_now(), reason, attemptId],
+    );
+    final sessionId = rows.single['session_id'] as String?;
+    if (sessionId != null) {
+      _recordEvent(
+        sessionId,
+        attemptId: attemptId,
+        userId: rows.single['user_id'] as String?,
+        type: type,
+        message: reason,
+      );
+    }
+  }
+
+  AssessmentAttemptEvent _recordEvent(
+    String sessionId, {
+    String? attemptId,
+    String? userId,
+    required String type,
+    required String message,
+    int? answeredQuestions,
+    int? totalQuestions,
+    int? score,
+  }) {
+    final event = AssessmentAttemptEvent(
+      id: _tokenService.newId(),
+      sessionId: sessionId,
+      attemptId: attemptId,
+      userId: userId,
+      studentName: userId == null ? null : _studentName(userId),
+      type: type,
+      message: message,
+      occurredAt: _clock().toUtc(),
+      answeredQuestions: answeredQuestions,
+      totalQuestions: totalQuestions,
+      score: score,
+    );
+    _database.execute(
+      '''
+      INSERT INTO assessment_attempt_events(
+        id, session_id, attempt_id, user_id, type, message,
+        answered_questions, total_questions, score, occurred_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''',
+      [
+        event.id,
+        sessionId,
+        attemptId,
+        userId,
+        type,
+        message,
+        answeredQuestions,
+        totalQuestions,
+        score,
+        event.occurredAt.toIso8601String(),
+      ],
+    );
+    _events.add(event);
+    return event;
+  }
+
+  String? _studentName(String userId) {
+    final rows = _database.select(
+      'SELECT display_name FROM users WHERE id = ?',
+      [userId],
+    );
+    return rows.isEmpty ? null : rows.single['display_name']! as String;
+  }
+
+  List<AssessmentAttemptEvent> _eventsForSession(String sessionId) {
+    return _database
+        .select(
+          '''
+          SELECT e.*, u.display_name
+          FROM assessment_attempt_events e
+          LEFT JOIN users u ON u.id = e.user_id
+          WHERE e.session_id = ?
+          ORDER BY e.occurred_at
+        ''',
+          [sessionId],
+        )
+        .map(_eventFromRow)
+        .toList();
+  }
+
+  List<AssessmentAttemptEvent> _eventsForAttempt(String attemptId) {
+    return _database
+        .select(
+          '''
+          SELECT e.*, u.display_name
+          FROM assessment_attempt_events e
+          LEFT JOIN users u ON u.id = e.user_id
+          WHERE e.attempt_id = ?
+          ORDER BY e.occurred_at
+        ''',
+          [attemptId],
+        )
+        .map(_eventFromRow)
+        .toList();
+  }
+
+  AssessmentAttemptEvent _eventFromRow(Row row) => AssessmentAttemptEvent(
+    id: row['id']! as String,
+    sessionId: row['session_id']! as String,
+    attemptId: row['attempt_id'] as String?,
+    userId: row['user_id'] as String?,
+    studentName: row['display_name'] as String?,
+    type: row['type']! as String,
+    message: row['message']! as String,
+    occurredAt: DateTime.parse(row['occurred_at']! as String),
+    answeredQuestions: row['answered_questions'] as int?,
+    totalQuestions: row['total_questions'] as int?,
+    score: row['score'] as int?,
+  );
+
+  List<AssessmentQuestionReport> _questionReports(String attemptId) {
+    return _database
+        .select(
+          '''
+          SELECT * FROM assessment_attempt_questions
+          WHERE attempt_id = ?
+          ORDER BY position
+        ''',
+          [attemptId],
+        )
+        .map((question) {
+          final questionId = question['question_id']! as String;
+          final options = _optionRows(attemptId, questionId);
+          final selected = _selected(attemptId, questionId).toSet();
+          final correct = options
+              .where((row) => row['is_correct'] == 1)
+              .map((row) => row['option_id']! as String)
+              .toSet();
+          final isCorrect =
+              selected.length == correct.length &&
+              selected.containsAll(correct);
+          return AssessmentQuestionReport(
+            number: question['position']! as int,
+            topicTitle: question['topic_title']! as String,
+            prompt: question['prompt']! as String,
+            selectedOptionTexts: options
+                .where((row) => selected.contains(row['option_id']))
+                .map((row) => row['text']! as String)
+                .toList(),
+            correctOptionTexts: options
+                .where((row) => correct.contains(row['option_id']))
+                .map((row) => row['text']! as String)
+                .toList(),
+            isCorrect: isCorrect,
+            points: isCorrect ? 1 : 0,
+            explanation: question['explanation']! as String,
+          );
+        })
+        .toList();
+  }
+
   List<AssessmentOption> _options(String attemptId, String questionId) =>
       _optionRows(attemptId, questionId)
           .map(
@@ -658,4 +1452,8 @@ class SqliteAssessmentStore implements AssessmentStore {
     'attempt_not_found',
     'El intento no existe o pertenece a otro estudiante.',
   );
+}
+
+extension _SingleOrNull<T> on Iterable<T> {
+  T? get singleOrNull => isEmpty ? null : single;
 }

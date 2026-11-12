@@ -40,6 +40,7 @@ class CatalogDatabase {
     if (!_migrationApplied(2)) _applyMigrationTwo();
     if (!_migrationApplied(3)) _applyMigrationThree();
     if (!_migrationApplied(4)) _applyMigrationFour();
+    if (!_migrationApplied(5)) _applyMigrationFive();
     _seedCatalog();
   }
 
@@ -267,9 +268,14 @@ class CatalogDatabase {
           id TEXT PRIMARY KEY,
           user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
           world_id TEXT NOT NULL REFERENCES worlds(id) ON DELETE RESTRICT,
-          status TEXT NOT NULL CHECK (status IN ('open', 'submitted')),
+          status TEXT NOT NULL CHECK (status IN ('open', 'submitted', 'annulled')),
+          session_id TEXT REFERENCES assessment_sessions(id) ON DELETE SET NULL,
           started_at TEXT NOT NULL,
+          deadline_at TEXT,
           submitted_at TEXT,
+          annulled_at TEXT,
+          annulled_reason TEXT,
+          reactivation_count INTEGER NOT NULL DEFAULT 0,
           score INTEGER CHECK (score BETWEEN 0 AND 100),
           passed INTEGER CHECK (passed IN (0, 1)),
           correct_answers INTEGER,
@@ -339,6 +345,219 @@ class CatalogDatabase {
     });
   }
 
+  void _applyMigrationFive() {
+    database.execute('PRAGMA foreign_keys = OFF');
+    _transaction(() {
+      final now = DateTime.now().toUtc().toIso8601String();
+      database.execute('''
+        CREATE TABLE assessment_world_settings (
+          world_id TEXT PRIMARY KEY REFERENCES worlds(id) ON DELETE CASCADE,
+          duration_minutes INTEGER NOT NULL CHECK (duration_minutes BETWEEN 1 AND 240),
+          fullscreen_required INTEGER NOT NULL CHECK (fullscreen_required IN (0, 1)),
+          max_incidents INTEGER NOT NULL CHECK (max_incidents BETWEEN 1 AND 20),
+          return_grace_seconds INTEGER NOT NULL CHECK (return_grace_seconds BETWEEN 1 AND 120),
+          strict_mode INTEGER NOT NULL CHECK (strict_mode IN (0, 1)),
+          updated_at TEXT NOT NULL
+        )
+      ''');
+      database.execute('''
+        CREATE TABLE assessment_sessions (
+          id TEXT PRIMARY KEY,
+          world_id TEXT NOT NULL REFERENCES worlds(id) ON DELETE RESTRICT,
+          opened_by TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+          status TEXT NOT NULL CHECK (status IN ('open', 'closed')),
+          opened_at TEXT NOT NULL,
+          closes_at TEXT NOT NULL,
+          closed_at TEXT,
+          duration_minutes INTEGER NOT NULL CHECK (duration_minutes BETWEEN 1 AND 240),
+          fullscreen_required INTEGER NOT NULL CHECK (fullscreen_required IN (0, 1)),
+          max_incidents INTEGER NOT NULL CHECK (max_incidents BETWEEN 1 AND 20),
+          return_grace_seconds INTEGER NOT NULL CHECK (return_grace_seconds BETWEEN 1 AND 120),
+          strict_mode INTEGER NOT NULL CHECK (strict_mode IN (0, 1))
+        )
+      ''');
+      database.execute('''
+        CREATE UNIQUE INDEX idx_assessment_session_open
+        ON assessment_sessions(world_id)
+        WHERE status = 'open'
+      ''');
+
+      if (!_columnExists('assessment_attempts', 'deadline_at')) {
+        _rebuildAssessmentAttemptTables();
+      }
+
+      database.execute('''
+        CREATE TABLE assessment_draft_answers (
+          attempt_id TEXT NOT NULL REFERENCES assessment_attempts(id) ON DELETE CASCADE,
+          question_id TEXT NOT NULL,
+          option_id TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY(attempt_id, question_id, option_id),
+          FOREIGN KEY(attempt_id, question_id, option_id)
+            REFERENCES assessment_attempt_options(
+              attempt_id, question_id, option_id
+            ) ON DELETE CASCADE
+        )
+      ''');
+      database.execute('''
+        CREATE TABLE assessment_attempt_events (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL REFERENCES assessment_sessions(id) ON DELETE CASCADE,
+          attempt_id TEXT REFERENCES assessment_attempts(id) ON DELETE CASCADE,
+          user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+          type TEXT NOT NULL,
+          message TEXT NOT NULL,
+          answered_questions INTEGER,
+          total_questions INTEGER,
+          score INTEGER,
+          occurred_at TEXT NOT NULL
+        )
+      ''');
+      database.execute('''
+        CREATE INDEX idx_assessment_events_session
+        ON assessment_attempt_events(session_id, occurred_at)
+      ''');
+      database.execute(
+        '''
+        INSERT OR IGNORE INTO assessment_world_settings(
+          world_id, duration_minutes, fullscreen_required, max_incidents,
+          return_grace_seconds, strict_mode, updated_at
+        )
+        SELECT id, 20, 1, 2, 10, 1, ? FROM worlds
+      ''',
+        [now],
+      );
+      database.execute(
+        '''
+        INSERT INTO schema_migrations(version, applied_at)
+        VALUES (?, ?)
+      ''',
+        [5, now],
+      );
+    });
+    database.execute('PRAGMA foreign_keys = ON');
+  }
+
+  bool _columnExists(String table, String column) {
+    return database
+        .select('PRAGMA table_info($table)')
+        .any((row) => row['name'] == column);
+  }
+
+  void _rebuildAssessmentAttemptTables() {
+    database.execute('DROP INDEX IF EXISTS idx_assessment_open');
+    database.execute('DROP INDEX IF EXISTS idx_assessment_history');
+    database.execute(
+      'ALTER TABLE assessment_attempts RENAME TO assessment_attempts_old',
+    );
+    database.execute(
+      'ALTER TABLE assessment_attempt_questions RENAME TO assessment_attempt_questions_old',
+    );
+    database.execute(
+      'ALTER TABLE assessment_attempt_options RENAME TO assessment_attempt_options_old',
+    );
+    database.execute(
+      'ALTER TABLE assessment_answers RENAME TO assessment_answers_old',
+    );
+    database.execute('''
+      CREATE TABLE assessment_attempts (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        world_id TEXT NOT NULL REFERENCES worlds(id) ON DELETE RESTRICT,
+        status TEXT NOT NULL CHECK (status IN ('open', 'submitted', 'annulled')),
+        session_id TEXT REFERENCES assessment_sessions(id) ON DELETE SET NULL,
+        started_at TEXT NOT NULL,
+        deadline_at TEXT,
+        submitted_at TEXT,
+        annulled_at TEXT,
+        annulled_reason TEXT,
+        reactivation_count INTEGER NOT NULL DEFAULT 0,
+        score INTEGER CHECK (score BETWEEN 0 AND 100),
+        passed INTEGER CHECK (passed IN (0, 1)),
+        correct_answers INTEGER,
+        total_questions INTEGER NOT NULL CHECK (total_questions > 0)
+      )
+    ''');
+    database.execute('''
+      INSERT INTO assessment_attempts(
+        id, user_id, world_id, status, started_at, deadline_at, submitted_at,
+        score, passed, correct_answers, total_questions
+      )
+      SELECT id, user_id, world_id, status, started_at, NULL, submitted_at,
+        score, passed, correct_answers, total_questions
+      FROM assessment_attempts_old
+    ''');
+    database.execute('''
+      CREATE UNIQUE INDEX idx_assessment_open
+      ON assessment_attempts(user_id, world_id)
+      WHERE status = 'open'
+    ''');
+    database.execute('''
+      CREATE INDEX idx_assessment_history
+      ON assessment_attempts(user_id, submitted_at)
+    ''');
+    database.execute('''
+      CREATE TABLE assessment_attempt_questions (
+        attempt_id TEXT NOT NULL
+          REFERENCES assessment_attempts(id) ON DELETE CASCADE,
+        question_id TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        topic_id TEXT NOT NULL,
+        topic_title TEXT NOT NULL,
+        prompt TEXT NOT NULL,
+        question_type TEXT NOT NULL
+          CHECK (question_type IN ('single', 'multiple')),
+        explanation TEXT NOT NULL,
+        content_version INTEGER NOT NULL,
+        PRIMARY KEY(attempt_id, question_id),
+        UNIQUE(attempt_id, position)
+      )
+    ''');
+    database.execute('''
+      INSERT INTO assessment_attempt_questions
+      SELECT * FROM assessment_attempt_questions_old
+    ''');
+    database.execute('''
+      CREATE TABLE assessment_attempt_options (
+        attempt_id TEXT NOT NULL,
+        question_id TEXT NOT NULL,
+        option_id TEXT NOT NULL,
+        text TEXT NOT NULL,
+        sort_order INTEGER NOT NULL,
+        is_correct INTEGER NOT NULL CHECK (is_correct IN (0, 1)),
+        PRIMARY KEY(attempt_id, question_id, option_id),
+        UNIQUE(attempt_id, question_id, sort_order),
+        FOREIGN KEY(attempt_id, question_id)
+          REFERENCES assessment_attempt_questions(attempt_id, question_id)
+          ON DELETE CASCADE
+      )
+    ''');
+    database.execute('''
+      INSERT INTO assessment_attempt_options
+      SELECT * FROM assessment_attempt_options_old
+    ''');
+    database.execute('''
+      CREATE TABLE assessment_answers (
+        attempt_id TEXT NOT NULL,
+        question_id TEXT NOT NULL,
+        option_id TEXT NOT NULL,
+        PRIMARY KEY(attempt_id, question_id, option_id),
+        FOREIGN KEY(attempt_id, question_id, option_id)
+          REFERENCES assessment_attempt_options(
+            attempt_id, question_id, option_id
+          ) ON DELETE RESTRICT
+      )
+    ''');
+    database.execute('''
+      INSERT INTO assessment_answers
+      SELECT * FROM assessment_answers_old
+    ''');
+    database.execute('DROP TABLE assessment_answers_old');
+    database.execute('DROP TABLE assessment_attempt_options_old');
+    database.execute('DROP TABLE assessment_attempt_questions_old');
+    database.execute('DROP TABLE assessment_attempts_old');
+  }
+
   void _seedCatalog() {
     _transaction(() {
       for (final world in seedWorlds) {
@@ -356,6 +575,19 @@ class CatalogDatabase {
             world.colorHex,
             world.sortOrder,
           ],
+        );
+      }
+      if (_migrationApplied(5)) {
+        final now = DateTime.now().toUtc().toIso8601String();
+        database.execute(
+          '''
+          INSERT OR IGNORE INTO assessment_world_settings(
+            world_id, duration_minutes, fullscreen_required, max_incidents,
+            return_grace_seconds, strict_mode, updated_at
+          )
+          SELECT id, 20, 1, 2, 10, 1, ? FROM worlds
+        ''',
+          [now],
         );
       }
       for (final topic in seedTopics) {

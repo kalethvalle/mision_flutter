@@ -37,6 +37,9 @@ class SessionGate extends StatelessWidget {
                   ChangeNotifierProvider(
                     create: (_) => ReportStore(repository)..load(),
                   ),
+                  ChangeNotifierProvider(
+                    create: (_) => AssessmentSessionStore(repository)..load(),
+                  ),
                 ],
                 child: const TeacherDashboard(),
               )

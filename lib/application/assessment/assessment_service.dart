@@ -15,6 +15,19 @@ abstract interface class AssessmentStore {
     Map<String, List<String>> answers,
   );
 
+  Future<void> saveDraftAnswers(
+    String userId,
+    String attemptId,
+    Map<String, List<String>> answers,
+  );
+
+  Future<AssessmentAttempt> recordIncident(
+    String userId,
+    String attemptId, {
+    required String type,
+    required String message,
+  });
+
   Future<AssessmentResult> loadResult(String userId, String attemptId);
 
   Future<TeacherReport> report({
@@ -22,6 +35,26 @@ abstract interface class AssessmentStore {
     String? worldId,
     String? topicId,
   });
+
+  Future<AssessmentSessionOverview> sessionOverview();
+
+  Future<AssessmentWorldSettings> saveSettings(
+    AssessmentWorldSettings settings,
+  );
+
+  Future<AssessmentSession> openSession(String teacherId, String worldId);
+
+  Future<AssessmentSession> closeSession(String teacherId, String sessionId);
+
+  Future<AssessmentSession> reactivateAttempt(
+    String teacherId,
+    String attemptId, {
+    required String reason,
+  });
+
+  Future<AssessmentDetailReport> detailReport(String attemptId);
+
+  Stream<AssessmentAttemptEvent> streamSessionEvents(String sessionId);
 }
 
 class AssessmentService {
@@ -66,6 +99,34 @@ class AssessmentService {
     return _store.submit(actor.id, attemptId, answers);
   }
 
+  Future<void> saveDraftAnswers(
+    UserModel actor,
+    String attemptId,
+    Map<String, List<String>> answers,
+  ) {
+    _requireStudent(actor);
+    _requiredId(attemptId, 'attemptId');
+    return _store.saveDraftAnswers(actor.id, attemptId, answers);
+  }
+
+  Future<AssessmentAttempt> recordIncident(
+    UserModel actor,
+    String attemptId, {
+    required String type,
+    required String message,
+  }) {
+    _requireStudent(actor);
+    _requiredId(attemptId, 'attemptId');
+    _requiredId(type, 'type');
+    _requiredId(message, 'message');
+    return _store.recordIncident(
+      actor.id,
+      attemptId,
+      type: type,
+      message: message,
+    );
+  }
+
   Future<AssessmentResult> loadResult(UserModel actor, String attemptId) {
     _requireStudent(actor);
     _requiredId(attemptId, 'attemptId');
@@ -84,6 +145,79 @@ class AssessmentService {
       worldId: _emptyToNull(worldId),
       topicId: _emptyToNull(topicId),
     );
+  }
+
+  Future<AssessmentSessionOverview> sessionOverview(UserModel actor) {
+    _requireTeacher(actor);
+    return _store.sessionOverview();
+  }
+
+  Future<AssessmentWorldSettings> saveSettings(
+    UserModel actor,
+    AssessmentWorldSettings settings,
+  ) {
+    _requireTeacher(actor);
+    _requiredId(settings.worldId, 'worldId');
+    if (settings.durationMinutes < 1 || settings.durationMinutes > 240) {
+      throw const CatalogException(
+        'validation_failed',
+        'La duración debe estar entre 1 y 240 minutos.',
+      );
+    }
+    if (settings.maxIncidents < 1 || settings.maxIncidents > 20) {
+      throw const CatalogException(
+        'validation_failed',
+        'El máximo de incidentes debe estar entre 1 y 20.',
+      );
+    }
+    if (settings.returnGraceSeconds < 1 || settings.returnGraceSeconds > 120) {
+      throw const CatalogException(
+        'validation_failed',
+        'La gracia de retorno debe estar entre 1 y 120 segundos.',
+      );
+    }
+    return _store.saveSettings(settings);
+  }
+
+  Future<AssessmentSession> openSession(UserModel actor, String worldId) {
+    _requireTeacher(actor);
+    _requiredId(worldId, 'worldId');
+    return _store.openSession(actor.id, worldId);
+  }
+
+  Future<AssessmentSession> closeSession(UserModel actor, String sessionId) {
+    _requireTeacher(actor);
+    _requiredId(sessionId, 'sessionId');
+    return _store.closeSession(actor.id, sessionId);
+  }
+
+  Future<AssessmentSession> reactivateAttempt(
+    UserModel actor,
+    String attemptId, {
+    required String reason,
+  }) {
+    _requireTeacher(actor);
+    _requiredId(attemptId, 'attemptId');
+    _requiredId(reason, 'reason');
+    return _store.reactivateAttempt(actor.id, attemptId, reason: reason);
+  }
+
+  Future<AssessmentDetailReport> detailReport(
+    UserModel actor,
+    String attemptId,
+  ) {
+    _requireTeacher(actor);
+    _requiredId(attemptId, 'attemptId');
+    return _store.detailReport(attemptId);
+  }
+
+  Stream<AssessmentAttemptEvent> streamSessionEvents(
+    UserModel actor,
+    String sessionId,
+  ) {
+    _requireTeacher(actor);
+    _requiredId(sessionId, 'sessionId');
+    return _store.streamSessionEvents(sessionId);
   }
 
   void _requireStudent(UserModel actor) {
