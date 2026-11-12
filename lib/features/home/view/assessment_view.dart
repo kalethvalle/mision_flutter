@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/models/assessment_model.dart';
 import '../../../core/models/authoring_model.dart';
 import '../../../core/store/assessment_store.dart';
+import 'student_theme.dart';
 
 class AssessmentView extends StatelessWidget {
   const AssessmentView({super.key, required this.store});
@@ -16,9 +17,9 @@ class AssessmentView extends StatelessWidget {
       final result = store.result;
       final attempt = store.attempt;
       return Scaffold(
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: QuestColors.background,
         appBar: AppBar(
-          backgroundColor: const Color(0xFF1E293B),
+          backgroundColor: QuestColors.surface,
           title: Text(
             result?.worldTitle ?? attempt?.worldTitle ?? 'Jefe final',
             maxLines: 1,
@@ -47,8 +48,9 @@ class _AttemptBody extends StatelessWidget {
     children: [
       const _AssessmentHeader(
         icon: Icons.sports_martial_arts,
-        title: 'JEFE FINAL',
+        title: 'Jefe final',
         message: 'Responde todas las preguntas y entrega cuando estés listo. No hay pistas ni límite de tiempo.',
+        color: QuestColors.boss,
       ),
       const SizedBox(height: 18),
       ...attempt.questions.asMap().entries.map(
@@ -78,11 +80,11 @@ class _AttemptBody extends StatelessWidget {
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context, false),
-                        child: const Text('CANCELAR'),
+                        child: const Text('Cancelar'),
                       ),
                       FilledButton(
                         onPressed: () => Navigator.pop(context, true),
-                        child: const Text('ENTREGAR'),
+                        child: const Text('Entregar'),
                       ),
                     ],
                   ),
@@ -90,7 +92,7 @@ class _AttemptBody extends StatelessWidget {
                 if (confirm == true) await store.submit();
               },
         icon: const Icon(Icons.flag),
-        label: Text(store.isBusy ? 'CALIFICANDO…' : 'ENTREGAR PARCIAL'),
+        label: Text(store.isBusy ? 'Calificando...' : 'Entregar parcial'),
       ),
       const SizedBox(height: 28),
     ],
@@ -111,18 +113,20 @@ class _QuestionCard extends StatelessWidget {
   final ValueChanged<String> onToggle;
 
   @override
-  Widget build(BuildContext context) => Card(
-    color: const Color(0xFF1E293B),
-    margin: const EdgeInsets.only(bottom: 14),
-    child: Padding(
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 14),
+    child: QuestCard(
+      borderColor: selected.isEmpty
+          ? QuestColors.border
+          : QuestColors.boss.withValues(alpha: 0.75),
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'PREGUNTA $number • ${question.topicTitle}',
+            'Pregunta $number - ${question.topicTitle}',
             style: const TextStyle(
-              color: Color(0xFF38BDF8),
+              color: QuestColors.boss,
               fontSize: 12,
               fontWeight: FontWeight.bold,
             ),
@@ -137,16 +141,19 @@ class _QuestionCard extends StatelessWidget {
             question.type == QuestionType.single
                 ? 'Selecciona una opción.'
                 : 'Selecciona todas las opciones correctas.',
-            style: const TextStyle(color: Color(0xFF94A3B8)),
+            style: const TextStyle(color: QuestColors.muted),
           ),
           const SizedBox(height: 12),
           ...question.options.map(
-            (option) => CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              value: selected.contains(option.id),
-              onChanged: (_) => onToggle(option.id),
-              title: Text(option.text),
-              controlAffinity: ListTileControlAffinity.leading,
+            (option) => Material(
+              type: MaterialType.transparency,
+              child: CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: selected.contains(option.id),
+                onChanged: (_) => onToggle(option.id),
+                title: Text(option.text),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
             ),
           ),
         ],
@@ -168,7 +175,7 @@ class _ResultBody extends StatelessWidget {
       children: [
         _AssessmentHeader(
           icon: result.passed ? Icons.emoji_events : Icons.replay,
-          title: result.passed ? '¡JEFE SUPERADO!' : 'SIGUE ENTRENANDO',
+          title: result.passed ? 'Jefe superado' : 'Sigue entrenando',
           message:
               '${result.score}/100 • ${result.correctAnswers}/${result.totalQuestions} respuestas correctas',
           color: color,
@@ -208,10 +215,9 @@ class _ReviewCard extends StatelessWidget {
   final AssessmentReview review;
 
   @override
-  Widget build(BuildContext context) => Card(
-    color: const Color(0xFF1E293B),
-    margin: const EdgeInsets.only(bottom: 12),
-    child: Padding(
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: QuestCard(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -246,14 +252,14 @@ class _ReviewCard extends StatelessWidget {
                     ? Colors.greenAccent
                     : selected
                     ? Colors.redAccent
-                    : const Color(0xFFCBD5E1),
+                    : QuestColors.text,
               ),
             );
           }),
           const SizedBox(height: 10),
           Text(
             review.explanation,
-            style: const TextStyle(color: Color(0xFFBAE6FD)),
+            style: const TextStyle(color: QuestColors.training),
           ),
         ],
       ),
@@ -266,7 +272,7 @@ class _AssessmentHeader extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.message,
-    this.color = const Color(0xFFA855F7),
+    this.color = QuestColors.boss,
   });
 
   final IconData icon;
@@ -278,10 +284,8 @@ class _AssessmentHeader extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(22),
     decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [color.withValues(alpha: 0.35), const Color(0xFF1E293B)],
-      ),
-      borderRadius: BorderRadius.circular(16),
+      color: QuestColors.surfaceRaised,
+      borderRadius: BorderRadius.circular(12),
       border: Border.all(color: color),
     ),
     child: Row(
@@ -300,7 +304,7 @@ class _AssessmentHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              Text(message, style: const TextStyle(color: Color(0xFFCBD5E1))),
+              Text(message, style: const TextStyle(color: QuestColors.muted)),
             ],
           ),
         ),

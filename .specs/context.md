@@ -32,6 +32,10 @@ resultado.
   contenido, selección exacta, nota aprobatoria de 80 e intentos ilimitados.
 - Historial estudiantil e informes docentes filtrables que distinguen
   entrenamiento y parciales por estudiante, mundo y tema.
+- Experiencia estudiantil separada en Arena de entrenamiento y Cámara del jefe
+  final, con navegación clara entre práctica, parciales e historial.
+- Script demo manual para cargar preguntas publicadas de parciales en ambos
+  mundos sin crear usuarios ni progreso automáticamente.
 
 ## Arquitectura y flujo de datos
 
@@ -81,6 +85,7 @@ actualiza el store y `notifyListeners()` reconstruye la interfaz.
 | [`identity-progress`](./identity-progress/spec.md) | 2026-10-30 | Bootstrap docente, cuentas estudiantiles, claves Argon2id, sesiones locales, autorización por rol e intentos y progreso secuencial persistidos y aislados por estudiante. Consulta el [plan ejecutado](./identity-progress/plan.md). |
 | [`content-authoring`](./content-authoring/spec.md) | 2026-10-30 | Editor docente de mundos, temas y misiones por plantillas, banco de preguntas single/multiple, borradores persistentes, publicación validada y versiones que conservan el historial de entrenamiento. Consulta el [plan ejecutado](./content-authoring/plan.md). |
 | [`assessments-reports`](./assessments-reports/spec.md) | 2026-10-30 | Jefes finales por mundo con preguntas versionadas, calificación desde 80, revisión posterior, historial repetible e informes docentes filtrados de entrenamiento y parciales. Consulta el [plan ejecutado](./assessments-reports/plan.md). |
+| [`student-arena-boss-ui`](./student-arena-boss-ui/spec.md) | 2026-11-02 | Rediseño de la experiencia estudiantil en Arena de entrenamiento y Cámara del jefe final, mejora visual de misiones y parciales, y script demo idempotente de preguntas publicadas. Consulta el [plan ejecutado](./student-arena-boss-ui/plan.md). |
 
 ## Deuda técnica conocida
 

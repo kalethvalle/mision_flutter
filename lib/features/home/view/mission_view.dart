@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/models/mission_model.dart';
 import '../../../core/store/game_store.dart';
 import '../presentation/catalog_presentation_registry.dart';
+import 'student_theme.dart';
 
 class MissionView extends StatelessWidget {
   const MissionView({super.key});
@@ -13,7 +14,7 @@ class MissionView extends StatelessWidget {
     final store = context.watch<GameStore>();
     final mission = store.currentMissionOrNull;
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: QuestColors.background,
       appBar: _buildAppBar(context, store, mission),
       body: SafeArea(child: _bodyFor(context, store, mission)),
     );
@@ -47,7 +48,7 @@ class MissionView extends StatelessWidget {
         ? Row(
             children: [
               Expanded(flex: 5, child: _EditorPanel(mission: mission)),
-              const VerticalDivider(width: 1, color: Color(0xFF334155)),
+              const VerticalDivider(width: 1, color: QuestColors.border),
               Expanded(flex: 6, child: _PreviewPanel(mission: mission)),
             ],
           )
@@ -66,10 +67,10 @@ class MissionView extends StatelessWidget {
   ) {
     final compact = MediaQuery.sizeOf(context).width < 700;
     return AppBar(
-      backgroundColor: const Color(0xFF1E293B),
+      backgroundColor: QuestColors.surface,
       elevation: 0,
       leading: IconButton(
-        icon: const Icon(Icons.map_rounded, color: Color(0xFF38BDF8)),
+        icon: const Icon(Icons.map_rounded, color: QuestColors.training),
         onPressed: store.goToWorldMap,
         tooltip: 'Volver al Mapa',
       ),
@@ -84,35 +85,61 @@ class MissionView extends StatelessWidget {
               '${mission.worldTitle} • ${mission.missionTitle}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 14, color: Color(0xFF7DD3FC)),
+              style: const TextStyle(fontSize: 14, color: QuestColors.training),
             ),
       actions: mission == null
           ? const []
+          : compact
+          ? [
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert_rounded),
+                onSelected: (value) {
+                  if (value == 'previous') store.previousMission();
+                  if (value == 'next') store.nextMission();
+                  if (value == 'hint') _showHint(context, store, mission);
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'previous',
+                    enabled: store.hasPrevMission,
+                    child: const Text('Misión anterior'),
+                  ),
+                  PopupMenuItem(
+                    value: 'next',
+                    enabled: store.hasNextMission,
+                    child: const Text('Siguiente misión'),
+                  ),
+                  const PopupMenuItem(value: 'hint', child: Text('Pista')),
+                ],
+              ),
+            ]
           : [
               IconButton(
                 icon: const Icon(Icons.arrow_back),
                 onPressed: store.hasPrevMission ? store.previousMission : null,
-                tooltip: 'Misión Anterior',
+                tooltip: 'Misión anterior',
               ),
               IconButton(
                 icon: const Icon(Icons.arrow_forward),
                 onPressed: store.hasNextMission ? store.nextMission : null,
-                tooltip: 'Siguiente Misión',
+                tooltip: 'Siguiente misión',
               ),
               IconButton(
                 icon: const Icon(Icons.lightbulb_outline, color: Colors.amber),
-                onPressed: () {
-                  store.markHintUsed();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(mission.hint),
-                      backgroundColor: const Color(0xFF0284C7),
-                    ),
-                  );
-                },
+                onPressed: () => _showHint(context, store, mission),
                 tooltip: 'Pista',
               ),
             ],
+    );
+  }
+
+  void _showHint(BuildContext context, GameStore store, MissionModel mission) {
+    store.markHintUsed();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(mission.hint),
+        backgroundColor: QuestColors.surfaceRaised,
+      ),
     );
   }
 }
@@ -126,7 +153,7 @@ class _EditorPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final store = context.watch<GameStore>();
     return Container(
-      color: const Color(0xFF1E293B),
+      color: QuestColors.surface,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final codeHeight = constraints.maxWidth < 600 ? 180.0 : 240.0;
@@ -143,9 +170,9 @@ class _EditorPanel extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A),
+                      color: QuestColors.background,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFF334155)),
+                      border: Border.all(color: QuestColors.border),
                     ),
                     child: SingleChildScrollView(
                       child: Column(
@@ -159,8 +186,8 @@ class _EditorPanel extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'Opciones disponibles:',
-                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                  'Opciones disponibles',
+                  style: TextStyle(color: QuestColors.muted, fontSize: 12),
                 ),
                 const SizedBox(height: 8),
                 Wrap(
@@ -179,8 +206,8 @@ class _EditorPanel extends StatelessWidget {
                         ),
                       ),
                       selected: selected,
-                      selectedColor: const Color(0xFF38BDF8),
-                      backgroundColor: const Color(0xFF334155),
+                      selectedColor: QuestColors.training,
+                      backgroundColor: QuestColors.border,
                       onSelected: store.isCheckingAnswer
                           ? null
                           : (value) =>
@@ -194,7 +221,7 @@ class _EditorPanel extends StatelessWidget {
                   height: 48,
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
+                      backgroundColor: QuestColors.success,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -213,11 +240,12 @@ class _EditorPanel extends StatelessWidget {
                             color: Colors.white,
                           ),
                     label: Text(
-                      store.isCheckingAnswer ? 'COMPROBANDO…' : 'PROBAR CÓDIGO',
+                      store.isCheckingAnswer
+                          ? 'Comprobando...'
+                          : 'Probar código',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
-                        letterSpacing: 1,
                       ),
                     ),
                   ),
@@ -243,17 +271,17 @@ class _EditorPanel extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           decoration: BoxDecoration(
-            color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+            color: QuestColors.training.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(4),
             border: Border.all(
-              color: option == null ? Colors.amber : const Color(0xFF38BDF8),
+              color: option == null ? QuestColors.boss : QuestColors.training,
             ),
           ),
           child: Text(
             option?.codeSnippet ?? '[ SELECCIONA ]',
             style: const TextStyle(
               fontFamily: 'monospace',
-              color: Colors.amberAccent,
+              color: QuestColors.boss,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -267,7 +295,7 @@ class _EditorPanel extends StatelessWidget {
     text,
     style: const TextStyle(
       fontFamily: 'monospace',
-      color: Color(0xFFE2E8F0),
+      color: QuestColors.text,
       fontSize: 14,
       height: 1.5,
     ),
@@ -289,18 +317,16 @@ class _MissionGuidanceCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF172554), Color(0xFF1E293B)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF38BDF8), width: 1.5),
+        color: QuestColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: QuestColors.training, width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _GuidanceTitle(
             icon: Icons.school_rounded,
-            text: 'ANTES DE COMENZAR',
+            text: 'Antes de comenzar',
           ),
           if (completed) ...[
             const SizedBox(height: 10),
@@ -308,12 +334,14 @@ class _MissionGuidanceCard extends StatelessWidget {
               children: [
                 Icon(Icons.check_circle, size: 17, color: Color(0xFF10B981)),
                 SizedBox(width: 6),
-                Text(
-                  'MISIÓN COMPLETADA',
-                  style: TextStyle(
-                    color: Color(0xFF6EE7B7),
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Text(
+                    'Misión completada',
+                    style: TextStyle(
+                      color: QuestColors.success,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -327,7 +355,7 @@ class _MissionGuidanceCard extends StatelessWidget {
             style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: QuestColors.text,
             ),
           ),
           const SizedBox(height: 6),
@@ -335,7 +363,7 @@ class _MissionGuidanceCard extends StatelessWidget {
             mission.description,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0xFFCBD5E1), height: 1.35),
+            style: const TextStyle(color: QuestColors.muted, height: 1.35),
           ),
           const SizedBox(height: 18),
           const _GuidanceTitle(
@@ -347,7 +375,7 @@ class _MissionGuidanceCard extends StatelessWidget {
             mission.learningContextParagraphs[0],
             maxLines: 4,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0xFFE2E8F0), height: 1.35),
+            style: const TextStyle(color: QuestColors.text, height: 1.35),
           ),
           const SizedBox(height: 8),
           Text(
@@ -355,7 +383,7 @@ class _MissionGuidanceCard extends StatelessWidget {
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Color(0xFFBAE6FD),
+              color: QuestColors.training,
               height: 1.35,
               fontWeight: FontWeight.w500,
             ),
@@ -374,7 +402,7 @@ class _MissionGuidanceCard extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 11,
-                    backgroundColor: const Color(0xFF0EA5E9),
+                    backgroundColor: QuestColors.training,
                     child: Text(
                       '${entry.key + 1}',
                       style: const TextStyle(fontSize: 12, color: Colors.white),
@@ -387,7 +415,7 @@ class _MissionGuidanceCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Color(0xFFE2E8F0),
+                        color: QuestColors.text,
                         height: 1.35,
                       ),
                     ),
@@ -411,14 +439,18 @@ class _GuidanceTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      Icon(icon, size: 18, color: const Color(0xFF38BDF8)),
+      Icon(icon, size: 18, color: QuestColors.training),
       const SizedBox(width: 8),
-      Text(
-        text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 13,
-          fontWeight: FontWeight.bold,
+      Expanded(
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: QuestColors.text,
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     ],
@@ -433,20 +465,21 @@ class _PreviewPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final store = context.watch<GameStore>();
+    final compact = MediaQuery.sizeOf(context).width < 600;
     return Container(
-      padding: const EdgeInsets.all(24),
-      color: const Color(0xFF0F172A),
+      padding: EdgeInsets.all(compact ? 16 : 24),
+      color: QuestColors.background,
       child: Column(
         children: [
           if (store.isSuccess)
             _FeedbackBanner(
-              color: const Color(0xFF10B981),
+              color: QuestColors.success,
               icon: Icons.check_circle,
               message: '¡Excelente! Misión completada.',
               action: store.hasNextMission
                   ? store.nextMission
                   : store.goToWorldMap,
-              actionLabel: store.hasNextMission ? 'SIGUIENTE' : 'IR AL MAPA',
+              actionLabel: store.hasNextMission ? 'Siguiente' : 'Ir al mapa',
             ),
           if (store.showError)
             _FeedbackBanner(
@@ -459,12 +492,12 @@ class _PreviewPanel extends StatelessWidget {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
+                color: QuestColors.surface,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: store.isSuccess
                       ? const Color(0xFF10B981)
-                      : const Color(0xFF334155),
+                      : QuestColors.border,
                   width: 2,
                 ),
               ),
@@ -508,7 +541,7 @@ class _FeedbackBanner extends StatelessWidget {
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
       color: color.withValues(alpha: 0.2),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(10),
       border: Border.all(color: color),
     ),
     child: Row(
@@ -516,10 +549,19 @@ class _FeedbackBanner extends StatelessWidget {
         Icon(icon, color: color),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(message, style: const TextStyle(color: Colors.white)),
+          child: Text(message, style: const TextStyle(color: QuestColors.text)),
         ),
         if (action != null && actionLabel != null)
-          TextButton(onPressed: action, child: Text(actionLabel!)),
+          Flexible(
+            child: TextButton(
+              onPressed: action,
+              child: Text(
+                actionLabel!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
       ],
     ),
   );
@@ -543,12 +585,12 @@ class _MissionStatus extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 54, color: const Color(0xFF94A3B8)),
+          Icon(icon, size: 54, color: QuestColors.muted),
           const SizedBox(height: 16),
           Text(message, textAlign: TextAlign.center),
           if (action != null) ...[
             const SizedBox(height: 16),
-            ElevatedButton(onPressed: action, child: const Text('REINTENTAR')),
+            ElevatedButton(onPressed: action, child: const Text('Reintentar')),
           ],
         ],
       ),
