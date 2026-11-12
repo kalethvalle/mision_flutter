@@ -10,20 +10,23 @@ void main() {
     await tester.pumpWidget(FlutterQuestApp(catalogRepository: repository));
     await tester.pumpAndSettle();
 
-    expect(find.text('Mapa de Mundos'), findsOneWidget);
+    expect(find.text('Arena de entrenamiento'), findsWidgets);
     expect(find.text('Mundo 1: Fundamentos de Dart'), findsOneWidget);
-    expect(find.text('QUÉ APRENDERÁS'), findsOneWidget);
     expect(find.text('Tipos numéricos'), findsOneWidget);
-    expect(find.text('ENTRAR'), findsOneWidget);
+    expect(find.text('Entrar'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('Mundo 2: Layouts & Flexbox'),
       400,
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('Mundo 2: Layouts & Flexbox'), findsOneWidget);
-    expect(find.text('QUÉ APRENDERÁS'), findsOneWidget);
     expect(find.text('Superposición'), findsOneWidget);
-    expect(find.text('BLOQUEADO'), findsOneWidget);
+    expect(find.text('Bloqueado'), findsOneWidget);
+
+    await tester.tap(find.text('Jefe final').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Cámara del jefe final'), findsOneWidget);
+    expect(find.textContaining('Completa todas las misiones'), findsWidgets);
   });
 
   testWidgets('presenta la guía antes del ejercicio y respeta sus límites', (
@@ -35,11 +38,11 @@ void main() {
     await tester.pumpWidget(FlutterQuestApp(catalogRepository: repository));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('ENTRAR'));
+    await tester.tap(find.text('Entrar'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
-    expect(find.text('ANTES DE COMENZAR'), findsOneWidget);
+    expect(find.text('Antes de comenzar'), findsOneWidget);
     expect(find.text('Lo que aprenderás'), findsOneWidget);
     expect(find.text('Pasos para resolver'), findsOneWidget);
 
@@ -55,7 +58,7 @@ void main() {
       expect(tester.widget<Text>(find.text(instruction)).maxLines, 2);
     }
 
-    final guideTop = tester.getTopLeft(find.text('ANTES DE COMENZAR')).dy;
+    final guideTop = tester.getTopLeft(find.text('Antes de comenzar')).dy;
     final codeTop = tester.getTopLeft(find.text('[ SELECCIONA ]')).dy;
     expect(guideTop, lessThan(codeTop));
 
@@ -67,9 +70,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(correctOption.label));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('PROBAR CÓDIGO'));
+    await tester.ensureVisible(find.text('Probar código'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('PROBAR CÓDIGO'));
+    await tester.tap(find.text('Probar código'));
     await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.arrow_forward));
     await tester.pumpAndSettle();
@@ -89,9 +92,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    await tester.tap(find.text('ENTRAR'));
+    await tester.ensureVisible(find.text('Entrar'));
     await tester.pumpAndSettle();
-    expect(find.text('ANTES DE COMENZAR'), findsOneWidget);
+    await tester.tap(find.text('Entrar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Antes de comenzar'), findsOneWidget);
     expect(find.text('Lo que aprenderás'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -109,7 +114,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Servidor local no disponible.'), findsOneWidget);
-    expect(find.text('REINTENTAR'), findsOneWidget);
+    expect(find.text('Reintentar'), findsOneWidget);
   });
 
   testWidgets('crea docente y estudiante antes de iniciar el entrenamiento', (
@@ -147,7 +152,7 @@ void main() {
     await tester.tap(find.text('INGRESAR'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Mapa de Mundos'), findsOneWidget);
+    expect(find.text('Arena de entrenamiento'), findsWidgets);
     expect(find.textContaining('Ana Estudiante'), findsOneWidget);
   });
 
@@ -209,27 +214,28 @@ void main() {
     await tester.pumpWidget(FlutterQuestApp(catalogRepository: repository));
     await tester.pumpAndSettle();
 
-    expect(find.text('JEFE FINAL'), findsNWidgets(2));
-    await tester.tap(find.text('JEFE FINAL').first);
+    await tester.tap(find.text('Jefe final').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Cámara del jefe final'), findsOneWidget);
+    final bossButton = find.widgetWithText(FilledButton, 'Jefe final').first;
+    await tester.tap(bossButton);
     await tester.pumpAndSettle();
     expect(find.text('Pregunta de prueba'), findsOneWidget);
     expect(find.text('Explicación de prueba.'), findsNothing);
 
     await tester.tap(find.text('Correcta'));
-    await tester.tap(find.text('ENTREGAR PARCIAL'));
+    await tester.tap(find.text('Entregar parcial'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('ENTREGAR'));
+    await tester.tap(find.text('Entregar'));
     await tester.pumpAndSettle();
-    expect(find.text('¡JEFE SUPERADO!'), findsOneWidget);
+    expect(find.text('Jefe superado'), findsOneWidget);
     expect(find.textContaining('100/100'), findsWidgets);
     expect(find.text('Explicación de prueba.'), findsOneWidget);
 
     await tester.pageBack();
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Historial de parciales'));
-    await tester.pumpAndSettle();
     expect(find.text('Historial de parciales'), findsOneWidget);
-    expect(find.text('100/100 • APROBADO'), findsOneWidget);
+    expect(find.text('1/1 correctas'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -256,18 +262,14 @@ void main() {
     await tester.pumpWidget(FlutterQuestApp(catalogRepository: repository));
     await tester.pumpAndSettle();
 
-    final bossButton = find.widgetWithText(OutlinedButton, 'JEFE FINAL').first;
-    await tester.scrollUntilVisible(
-      bossButton,
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.ensureVisible(bossButton);
+    await tester.tap(find.text('Jefe final').first);
     await tester.pumpAndSettle();
+    final bossButton = find.widgetWithText(FilledButton, 'Jefe final').at(1);
+    await tester.ensureVisible(bossButton);
     await tester.tap(bossButton);
     await tester.pumpAndSettle();
     expect(find.text('Pregunta de prueba'), findsOneWidget);
-    expect(find.text('ENTREGAR PARCIAL'), findsOneWidget);
+    expect(find.text('Entregar parcial'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
