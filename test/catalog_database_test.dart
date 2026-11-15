@@ -22,7 +22,7 @@ void main() {
 
   test('crea el esquema y siembra el catálogo sin duplicados', () async {
     var catalog = CatalogDatabase.open(databasePath);
-    expect(_count(catalog, 'schema_migrations'), 6);
+    expect(_count(catalog, 'schema_migrations'), 7);
     expect(_count(catalog, 'worlds'), 2);
     expect(_count(catalog, 'topics'), 9);
     expect(_count(catalog, 'missions'), 9);
@@ -43,6 +43,17 @@ void main() {
     expect(_count(catalog, 'assessment_sessions'), 0);
     expect(_count(catalog, 'assessment_draft_answers'), 0);
     expect(_count(catalog, 'assessment_attempt_events'), 0);
+    expect(_count(catalog, 'dw_dim_student'), 0);
+    expect(_count(catalog, 'dw_dim_world'), 0);
+    expect(_count(catalog, 'dw_dim_topic'), 0);
+    expect(_count(catalog, 'dw_dim_mission'), 0);
+    expect(_count(catalog, 'dw_dim_date'), 0);
+    expect(_count(catalog, 'dw_fact_training_attempt'), 0);
+    expect(_count(catalog, 'dw_fact_assessment_attempt'), 0);
+    expect(_count(catalog, 'dw_fact_assessment_topic_score'), 0);
+    expect(_count(catalog, 'dw_fact_integrity_event'), 0);
+    expect(_count(catalog, 'dw_refresh_state'), 0);
+    expect(_count(catalog, 'analytics_audit_log'), 0);
     expect(
       catalog.database.select('''
         SELECT mission_id
@@ -59,7 +70,7 @@ void main() {
     catalog.close();
 
     catalog = CatalogDatabase.open(databasePath);
-    expect(_count(catalog, 'schema_migrations'), 6);
+    expect(_count(catalog, 'schema_migrations'), 7);
     expect(_count(catalog, 'worlds'), 2);
     expect(_count(catalog, 'topics'), 9);
     expect(_count(catalog, 'missions'), 9);
@@ -95,6 +106,44 @@ void main() {
     );
   });
 
+  test('triggers de analítica registran cambios relevantes', () async {
+    final catalog = CatalogDatabase.open(databasePath);
+    addTearDown(catalog.close);
+    catalog.database.execute(
+      '''
+      INSERT INTO users(
+        id, username, username_normalized, display_name, role,
+        password_algorithm, password_salt, password_hash, password_memory,
+        password_iterations, password_parallelism, created_at, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''',
+      [
+        'student_1',
+        'ana',
+        'ana',
+        'Ana',
+        'student',
+        'test',
+        'salt',
+        'hash',
+        1,
+        1,
+        1,
+        DateTime.utc(2026, 1).toIso8601String(),
+        1,
+      ],
+    );
+
+    final audit = catalog.database.select('''
+      SELECT table_name, row_id, operation
+      FROM analytics_audit_log
+      WHERE table_name = 'users'
+    ''');
+    expect(audit, hasLength(1));
+    expect(audit.single['row_id'], 'student_1');
+    expect(audit.single['operation'], 'INSERT');
+  });
+
   test('migra base v4 con índices de parciales existentes', () async {
     final catalog = CatalogDatabase.open(databasePath);
     catalog.database.execute('PRAGMA foreign_keys = OFF');
@@ -104,7 +153,7 @@ void main() {
 
     final migrated = CatalogDatabase.open(databasePath);
     addTearDown(migrated.close);
-    expect(_count(migrated, 'schema_migrations'), 6);
+    expect(_count(migrated, 'schema_migrations'), 7);
     expect(_count(migrated, 'assessment_world_settings'), 2);
     final columns = migrated.database
         .select('PRAGMA table_info(assessment_attempts)')
@@ -231,7 +280,7 @@ void _downgradeAssessmentSchemaToV4(Database database) {
   database.execute('DROP TABLE assessment_attempt_options_v5');
   database.execute('DROP TABLE assessment_attempt_questions_v5');
   database.execute('DROP TABLE assessment_attempts_v5');
-  database.execute('DELETE FROM schema_migrations WHERE version IN (5, 6)');
+  database.execute('DELETE FROM schema_migrations WHERE version IN (5, 6, 7)');
 }
 
 int _count(CatalogDatabase catalog, String table) {
@@ -258,6 +307,17 @@ int _count(CatalogDatabase catalog, String table) {
     'assessment_sessions',
     'assessment_draft_answers',
     'assessment_attempt_events',
+    'dw_dim_student',
+    'dw_dim_world',
+    'dw_dim_topic',
+    'dw_dim_mission',
+    'dw_dim_date',
+    'dw_fact_training_attempt',
+    'dw_fact_assessment_attempt',
+    'dw_fact_assessment_topic_score',
+    'dw_fact_integrity_event',
+    'dw_refresh_state',
+    'analytics_audit_log',
   };
   if (!allowed.contains(table)) throw ArgumentError.value(table);
   return catalog.database

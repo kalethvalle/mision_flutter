@@ -25,7 +25,8 @@ resultado.
 - Intentos, uso de pistas, progreso y desbloqueos secuenciales persistidos por
   estudiante en SQLite.
 - Panel docente con autoría de mundos, temas y misiones basadas en las nueve
-  vistas previas implementadas.
+  vistas previas implementadas, ahora reforzado con orientación visual de ruta
+  docente, conteos accionables y próximos pasos.
 - Banco versionado de preguntas de selección única y múltiple, con estados
   borrador/publicado y validación previa a la publicación.
 - Parciales por mundo disponibles tras completar sus misiones, con snapshots de
@@ -40,10 +41,15 @@ resultado.
 - Historial estudiantil e informes docentes filtrables que distinguen
   entrenamiento y parciales por estudiante, mundo y tema, con detalle de
   duración, incidentes estructurados, reactivaciones y revisión por pregunta.
+- Mini data warehouse local reconstruible en SQLite con dimensiones/hechos,
+  auditoría por triggers y dashboard docente de métricas agregadas de
+  evolución, rendimiento académico, dificultad por tema e integridad.
 - Experiencia estudiantil separada en Arena de entrenamiento y Cámara del jefe
   final, con navegación clara entre práctica, parciales e historial.
 - Script demo manual para cargar preguntas publicadas de parciales en ambos
   mundos sin crear usuarios ni progreso automáticamente.
+- Instructivo docente en `docs/instructivo-docente.md` para crear mundos,
+  temas, misiones, preguntas, parciales y revisar resultados/métricas.
 
 ## Arquitectura y flujo de datos
 
@@ -56,7 +62,7 @@ resultado.
 - `lib/core/store` administra sesión, navegación, progreso, autoría, parciales
   e informes mediante estado reactivo.
 - `lib/application` contiene casos de uso de catálogo, identidad, progreso,
-  autoría, parciales e informes con autorización por rol.
+  autoría, parciales, informes y analítica con autorización por rol.
 - `lib/server` contiene API Shelf, migraciones, semilla y repositorios SQLite.
 - `bin/server.dart` sirve `build/web` y `/api/v1` desde el mismo origen.
 - `lib/features/home/view` presenta el mapa de mundos y la experiencia de cada
@@ -96,6 +102,8 @@ actualiza el store y `notifyListeners()` reconstruye la interfaz.
 | [`student-arena-boss-ui`](./student-arena-boss-ui/spec.md) | 2026-11-02 | Rediseño de la experiencia estudiantil en Arena de entrenamiento y Cámara del jefe final, mejora visual de misiones y parciales, y script demo idempotente de preguntas publicadas. Consulta el [plan ejecutado](./student-arena-boss-ui/plan.md). |
 | [`secure-assessment-sessions`](./secure-assessment-sessions/spec.md) | 2026-11-11 | Parciales activados por docente con configuración por mundo, deadline sincronizado, pantalla completa best effort, registro de incidentes, anulación y reactivación, monitoreo docente y reportes detallados por pregunta. Consulta el [plan ejecutado](./secure-assessment-sessions/plan.md). |
 | [`assessment-session-refinements`](./assessment-session-refinements/spec.md) | 2026-11-11 | Ajustes de Arena y parciales: pista contrastada, selección única/múltiple con radio/checkbox, selección múltiple en entrenamiento, nota por anulación y listas estructuradas de incidentes para docente. Consulta el [plan ejecutado](./assessment-session-refinements/plan.md). |
+| [`learning-analytics-dashboard`](./learning-analytics-dashboard/spec.md) | 2026-11-15 | Data warehouse estrella derivado, refresh docente, auditoría analítica y pestaña `MÉTRICAS` para evolución estudiantil, rendimiento académico, temas críticos e integridad. Consulta el [plan ejecutado](./learning-analytics-dashboard/plan.md). |
+| [`teacher-ux-guidance`](./teacher-ux-guidance/spec.md) | 2026-11-15 | Mejora UX incremental del panel docente con cabeceras orientadas a flujo, métricas compactas, pasos recomendados para contenido/parciales e instructivo operativo en `docs/`. Consulta el [plan ejecutado](./teacher-ux-guidance/plan.md). |
 
 ## Deuda técnica conocida
 
@@ -104,5 +112,7 @@ actualiza el store y `notifyListeners()` reconstruye la interfaz.
   tipos de vista previa desde la interfaz.
 - Los informes no incluyen exportación, gráficos agregados ni sincronización
   con servicios externos; el monitoreo SSE inicial es local al proceso Dart.
+- Materias, jornadas e inscripción de estudiantes quedan como épica futura
+  para atribuir intentos a una materia-jornada sin romper el historial actual.
 - Android aún no tiene adaptador SQLite nativo ni validación en esta fase.
 

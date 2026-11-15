@@ -1,6 +1,7 @@
 import 'package:shelf/shelf.dart';
 
 import 'catalog_api.dart';
+import 'analytics_api.dart';
 import 'authoring_api.dart';
 import 'assessment_api.dart';
 import 'identity_api.dart';
@@ -12,6 +13,7 @@ Handler createApiHandler({
   required TrainingApi trainingApi,
   required AuthoringApi authoringApi,
   required AssessmentApi assessmentApi,
+  required AnalyticsApi analyticsApi,
 }) {
   return Cascade()
       .add(identityApi.handler)
@@ -19,6 +21,7 @@ Handler createApiHandler({
       .add(trainingApi.handler)
       .add(authoringApi.handler)
       .add(assessmentApi.handler)
+      .add(analyticsApi.handler)
       .add((request) => Response.notFound('Ruta API no encontrada.'))
       .handler;
 }

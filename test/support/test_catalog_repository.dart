@@ -1,4 +1,5 @@
 import 'package:mision_flutter/core/models/answer_check_result.dart';
+import 'package:mision_flutter/core/models/analytics_model.dart';
 import 'package:mision_flutter/core/models/assessment_model.dart';
 import 'package:mision_flutter/core/models/authoring_model.dart';
 import 'package:mision_flutter/core/models/mission_model.dart';
@@ -736,6 +737,45 @@ class TestCatalogRepository implements FlutterQuestRepository {
     String attemptId,
   ) async {
     throw const CatalogException('attempt_not_found', 'Intento inexistente.');
+  }
+
+  @override
+  Future<AnalyticsDashboard> getAnalyticsDashboard() async {
+    return _analyticsDashboard();
+  }
+
+  @override
+  Future<AnalyticsDashboard> refreshAnalyticsDashboard() async {
+    return _analyticsDashboard();
+  }
+
+  AnalyticsDashboard _analyticsDashboard() {
+    return AnalyticsDashboard(
+      refreshedAt: DateTime.utc(2026, 10, 30, 12),
+      summary: AnalyticsKpiSummary(
+        totalStudents: _users
+            .where((user) => user.role == UserRole.student)
+            .length,
+        activeStudents: completedMissionIds.isEmpty ? 0 : 1,
+        completedMissions: completedMissionIds.length,
+        trainingAttempts: completedMissionIds.length,
+        trainingAccuracy: completedMissionIds.isEmpty ? 0 : 100,
+        averageAssessmentScore: _assessmentHistory.isEmpty
+            ? 0
+            : (_assessmentHistory
+                          .map((item) => item.score)
+                          .reduce((a, b) => a + b) /
+                      _assessmentHistory.length)
+                  .round(),
+        approvalRate: _assessmentHistory.isEmpty ? 0 : 100,
+        incidents: 0,
+        annulledAttempts: 0,
+      ),
+      studentEvolution: const [],
+      academicPerformance: const [],
+      topicDifficulty: const [],
+      integrity: const [],
+    );
   }
 }
 

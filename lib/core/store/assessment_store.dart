@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../models/analytics_model.dart';
 import '../models/assessment_model.dart';
 import '../models/authoring_model.dart';
 import '../repositories/catalog_repository.dart';
@@ -306,6 +307,52 @@ class ReportStore extends ChangeNotifier {
       _error = error is CatalogException
           ? error.message
           : 'No fue posible cargar el detalle.';
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+}
+
+class AnalyticsStore extends ChangeNotifier {
+  AnalyticsStore(this._repository);
+
+  final FlutterQuestRepository _repository;
+
+  AnalyticsDashboard? _dashboard;
+  String? _error;
+  bool _loading = false;
+
+  AnalyticsDashboard? get dashboard => _dashboard;
+  String? get error => _error;
+  bool get loading => _loading;
+
+  Future<void> load() async {
+    _loading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      _dashboard = await _repository.getAnalyticsDashboard();
+    } on Object catch (error) {
+      _error = error is CatalogException
+          ? error.message
+          : 'No fue posible cargar las métricas.';
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> refresh() async {
+    _loading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      _dashboard = await _repository.refreshAnalyticsDashboard();
+    } on Object catch (error) {
+      _error = error is CatalogException
+          ? error.message
+          : 'No fue posible recalcular las métricas.';
     } finally {
       _loading = false;
       notifyListeners();
