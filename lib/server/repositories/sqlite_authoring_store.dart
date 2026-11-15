@@ -152,9 +152,9 @@ class SqliteAuthoringStore implements ContentAuthoringStore {
           '''
           INSERT INTO missions(
             id, world_id, topic_id, title, description, hint, category,
-            code_template, target_placeholder, preview_type, sort_order,
-            status, content_version
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            code_template, target_placeholder, selection_type, preview_type,
+            sort_order, status, content_version
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         ''',
           [
             id,
@@ -166,6 +166,7 @@ class SqliteAuthoringStore implements ContentAuthoringStore {
             mission.category.wireName,
             jsonEncode(mission.codeTemplate),
             mission.targetPlaceholder,
+            mission.selectionType.wireName,
             mission.previewType,
             mission.sortOrder,
             mission.status.wireName,
@@ -183,7 +184,7 @@ class SqliteAuthoringStore implements ContentAuthoringStore {
           UPDATE missions SET
             world_id = ?, topic_id = ?, title = ?, description = ?, hint = ?,
             category = ?, code_template = ?, target_placeholder = ?,
-            preview_type = ?, sort_order = ?, status = ?,
+            selection_type = ?, preview_type = ?, sort_order = ?, status = ?,
             content_version = content_version + 1
           WHERE id = ?
         ''',
@@ -196,6 +197,7 @@ class SqliteAuthoringStore implements ContentAuthoringStore {
             mission.category.wireName,
             jsonEncode(mission.codeTemplate),
             mission.targetPlaceholder,
+            mission.selectionType.wireName,
             mission.previewType,
             mission.sortOrder,
             mission.status.wireName,
@@ -448,6 +450,9 @@ class SqliteAuthoringStore implements ContentAuthoringStore {
         row['code_template']! as String,
       ) as List<Object?>).cast<String>(),
       targetPlaceholder: row['target_placeholder']! as String,
+      selectionType: MissionSelectionType.fromWireName(
+        row['selection_type']! as String,
+      ),
       previewType: row['preview_type']! as String,
       sortOrder: row['sort_order']! as int,
       status: ContentStatus.fromWireName(row['status']! as String),

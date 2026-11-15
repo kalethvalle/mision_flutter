@@ -91,6 +91,7 @@ class AssessmentWorldSettings {
     required this.maxIncidents,
     required this.returnGraceSeconds,
     required this.strictMode,
+    required this.annulledScore,
   });
 
   final String worldId;
@@ -99,6 +100,7 @@ class AssessmentWorldSettings {
   final int maxIncidents;
   final int returnGraceSeconds;
   final bool strictMode;
+  final int annulledScore;
 
   factory AssessmentWorldSettings.defaults(String worldId) =>
       AssessmentWorldSettings(
@@ -108,6 +110,7 @@ class AssessmentWorldSettings {
         maxIncidents: 2,
         returnGraceSeconds: 10,
         strictMode: true,
+        annulledScore: 0,
       );
 
   factory AssessmentWorldSettings.fromJson(Map<String, Object?> json) =>
@@ -118,6 +121,7 @@ class AssessmentWorldSettings {
         maxIncidents: json.integer('maxIncidents'),
         returnGraceSeconds: json.integer('returnGraceSeconds'),
         strictMode: json.boolean('strictMode'),
+        annulledScore: json.integer('annulledScore'),
       );
 
   Map<String, Object?> toJson() => {
@@ -127,6 +131,7 @@ class AssessmentWorldSettings {
     'maxIncidents': maxIncidents,
     'returnGraceSeconds': returnGraceSeconds,
     'strictMode': strictMode,
+    'annulledScore': annulledScore,
   };
 }
 
@@ -157,6 +162,7 @@ class AssessmentLiveAttempt {
     required this.totalQuestions,
     required this.incidents,
     required this.reactivationCount,
+    required this.events,
     this.submittedAt,
     this.score,
     this.annulledReason,
@@ -172,6 +178,7 @@ class AssessmentLiveAttempt {
   final int totalQuestions;
   final int incidents;
   final int reactivationCount;
+  final List<AssessmentAttemptEvent> events;
   final DateTime? submittedAt;
   final int? score;
   final String? annulledReason;
@@ -188,6 +195,10 @@ class AssessmentLiveAttempt {
         totalQuestions: json.integer('totalQuestions'),
         incidents: json.integer('incidents'),
         reactivationCount: json.integer('reactivationCount'),
+        events: json
+            .objects('events')
+            .map(AssessmentAttemptEvent.fromJson)
+            .toList(),
         submittedAt: json.optionalString('submittedAt') == null
             ? null
             : DateTime.parse(json.text('submittedAt')),
@@ -206,6 +217,7 @@ class AssessmentLiveAttempt {
     'totalQuestions': totalQuestions,
     'incidents': incidents,
     'reactivationCount': reactivationCount,
+    'events': events.map((event) => event.toJson()).toList(),
     'submittedAt': submittedAt?.toUtc().toIso8601String(),
     'score': score,
     'annulledReason': annulledReason,
@@ -631,6 +643,8 @@ class AssessmentResult {
     required this.submittedAt,
     required this.topics,
     required this.reviews,
+    required this.status,
+    this.annulledReason,
   });
 
   final String attemptId;
@@ -643,6 +657,8 @@ class AssessmentResult {
   final DateTime submittedAt;
   final List<TopicAssessmentScore> topics;
   final List<AssessmentReview> reviews;
+  final AssessmentAttemptStatus status;
+  final String? annulledReason;
 
   factory AssessmentResult.fromJson(
     Map<String, Object?> json,
@@ -657,6 +673,8 @@ class AssessmentResult {
     submittedAt: DateTime.parse(json.text('submittedAt')),
     topics: json.objects('topics').map(TopicAssessmentScore.fromJson).toList(),
     reviews: json.objects('reviews').map(AssessmentReview.fromJson).toList(),
+    status: AssessmentAttemptStatus.fromWireName(json.text('status')),
+    annulledReason: json.optionalString('annulledReason'),
   );
 
   Map<String, Object?> toJson() => {
@@ -670,6 +688,8 @@ class AssessmentResult {
     'submittedAt': submittedAt.toUtc().toIso8601String(),
     'topics': topics.map((topic) => topic.toJson()).toList(),
     'reviews': reviews.map((review) => review.toJson()).toList(),
+    'status': status.wireName,
+    'annulledReason': annulledReason,
   };
 }
 

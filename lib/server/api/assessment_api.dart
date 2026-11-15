@@ -182,6 +182,7 @@ class AssessmentApi {
           maxIncidents: _int(body, 'maxIncidents'),
           returnGraceSeconds: _int(body, 'returnGraceSeconds'),
           strictMode: _bool(body, 'strictMode'),
+          annulledScore: _int(body, 'annulledScore'),
         );
         final saved = await _assessmentService.saveSettings(actor, settings);
         return jsonResponse(200, {'settings': saved.toJson()});

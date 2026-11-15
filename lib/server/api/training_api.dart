@@ -34,9 +34,16 @@ class TrainingApi {
     return guardApi(() async {
       final user = await _security.requireUser(request);
       final body = await readJsonObject(request);
-      final optionId = body['optionId'];
+      final rawOptionIds = body['optionIds'];
+      final legacyOptionId = body['optionId'];
       final hintUsed = body['hintUsed'];
-      if (optionId is! String || hintUsed is! bool) {
+      final optionIds = <String>[
+        if (rawOptionIds is List<Object?>)
+          ...rawOptionIds.whereType<String>()
+        else if (legacyOptionId is String)
+          legacyOptionId,
+      ];
+      if (optionIds.isEmpty || hintUsed is! bool) {
         throw const CatalogException(
           'invalid_option',
           'La opción y el indicador de pista son obligatorios.',
@@ -45,7 +52,7 @@ class TrainingApi {
       final result = await _progressService.checkAnswer(
         user: user,
         missionId: missionId,
-        optionId: optionId,
+        optionIds: optionIds,
         hintUsed: hintUsed,
       );
       return jsonResponse(200, {'result': result.toJson()});

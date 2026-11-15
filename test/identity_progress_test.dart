@@ -124,7 +124,7 @@ void main() {
         progress.checkAndRecord(
           userId: firstStudent.id,
           missionId: 'w1_m2',
-          optionId: 'final',
+          optionIds: const ['final'],
           hintUsed: false,
         ),
         throwsA(
@@ -146,7 +146,7 @@ void main() {
         await progress.checkAndRecord(
           userId: firstStudent.id,
           missionId: mission.id,
-          optionId: correct.id,
+          optionIds: [correct.id],
           hintUsed: mission.id == 'w1_m1',
         );
         now = now.add(const Duration(minutes: 1));
@@ -183,7 +183,7 @@ void main() {
         await progress.checkAndRecord(
           userId: firstStudent.id,
           missionId: mission.id,
-          optionId: correct.id,
+          optionIds: [correct.id],
           hintUsed: false,
         );
         now = now.add(const Duration(minutes: 1));

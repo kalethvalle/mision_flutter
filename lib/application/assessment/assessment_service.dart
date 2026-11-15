@@ -176,6 +176,12 @@ class AssessmentService {
         'La gracia de retorno debe estar entre 1 y 120 segundos.',
       );
     }
+    if (settings.annulledScore < 0 || settings.annulledScore > 100) {
+      throw const CatalogException(
+        'validation_failed',
+        'La nota por anulación debe estar entre 0 y 100.',
+      );
+    }
     return _store.saveSettings(settings);
   }
 

@@ -51,12 +51,12 @@ class HttpCatalogRepository implements FlutterQuestRepository {
   @override
   Future<AnswerCheckResult> checkMissionAnswer(
     String missionId,
-    String optionId, {
+    List<String> optionIds, {
     required bool hintUsed,
   }) async {
     final json = await _post(
       'missions/${Uri.encodeComponent(missionId)}/check',
-      {'optionId': optionId, 'hintUsed': hintUsed},
+      {'optionIds': optionIds, 'hintUsed': hintUsed},
     );
     return AnswerCheckResult.fromJson(_object(json, 'result'));
   }

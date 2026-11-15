@@ -21,7 +21,7 @@ class GameStore extends ChangeNotifier {
   final Map<String, List<MissionModel>> _missionsByWorld = {};
   String? _selectedWorldId;
   int _currentMissionIndex = 0;
-  String _selectedOptionId = '';
+  final Set<String> _selectedOptionIds = {};
   bool _isSuccess = false;
   bool _showError = false;
   bool _isCheckingAnswer = false;
@@ -38,7 +38,9 @@ class GameStore extends ChangeNotifier {
   String? get worldsError => _worldsError;
   String? get missionsError => _missionsError;
   String? get selectedWorldId => _selectedWorldId;
-  String get selectedOptionId => _selectedOptionId;
+  String get selectedOptionId =>
+      _selectedOptionIds.isEmpty ? '' : _selectedOptionIds.first;
+  Set<String> get selectedOptionIds => Set.unmodifiable(_selectedOptionIds);
   bool get isSuccess => _isSuccess;
   bool get showError => _showError;
   bool get isCheckingAnswer => _isCheckingAnswer;
@@ -167,9 +169,17 @@ class GameStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  void selectOption(String optionId) {
+  void selectOption(MissionModel mission, String optionId) {
     _answerGeneration++;
-    _selectedOptionId = optionId;
+    if (mission.selectionType == MissionSelectionType.single) {
+      _selectedOptionIds
+        ..clear()
+        ..add(optionId);
+    } else if (_selectedOptionIds.contains(optionId)) {
+      _selectedOptionIds.remove(optionId);
+    } else {
+      _selectedOptionIds.add(optionId);
+    }
     _isSuccess = false;
     _showError = false;
     _isCheckingAnswer = false;
@@ -185,8 +195,8 @@ class GameStore extends ChangeNotifier {
 
   Future<void> checkAnswer() async {
     final mission = currentMissionOrNull;
-    final optionId = _selectedOptionId;
-    if (mission == null || optionId.isEmpty || _isCheckingAnswer) return;
+    final optionIds = _selectedOptionIds.toList(growable: false);
+    if (mission == null || optionIds.isEmpty || _isCheckingAnswer) return;
 
     final generation = ++_answerGeneration;
     _isCheckingAnswer = true;
@@ -197,12 +207,12 @@ class GameStore extends ChangeNotifier {
     try {
       final result = await _catalogRepository.checkMissionAnswer(
         mission.id,
-        optionId,
+        optionIds,
         hintUsed: _hintUsed,
       );
       if (generation != _answerGeneration ||
           currentMissionOrNull?.id != mission.id ||
-          _selectedOptionId != optionId) {
+          !_sameSelection(_selectedOptionIds, optionIds)) {
         return;
       }
       _isSuccess = result.isCorrect;
@@ -238,7 +248,7 @@ class GameStore extends ChangeNotifier {
 
   void _resetMissionState({bool notify = true}) {
     _answerGeneration++;
-    _selectedOptionId = '';
+    _selectedOptionIds.clear();
     _isSuccess = false;
     _showError = false;
     _isCheckingAnswer = false;
@@ -258,6 +268,11 @@ class GameStore extends ChangeNotifier {
       (mission) => _progress.mission(mission.id)?.isUnlocked ?? false,
     );
     return lastUnlocked < 0 ? 0 : lastUnlocked;
+  }
+
+  bool _sameSelection(Set<String> current, List<String> expected) {
+    if (current.length != expected.length) return false;
+    return expected.every(current.contains);
   }
 
   String _messageFor(Object error) {

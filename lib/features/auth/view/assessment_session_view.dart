@@ -109,6 +109,9 @@ class _WorldSessionCardState extends State<_WorldSessionCard> {
   late final _grace = TextEditingController(
     text: '${widget.settings.returnGraceSeconds}',
   );
+  late final _annulledScore = TextEditingController(
+    text: '${widget.settings.annulledScore}',
+  );
   late bool _fullscreen = widget.settings.fullscreenRequired;
   late bool _strict = widget.settings.strictMode;
 
@@ -117,6 +120,7 @@ class _WorldSessionCardState extends State<_WorldSessionCard> {
     _duration.dispose();
     _maxIncidents.dispose();
     _grace.dispose();
+    _annulledScore.dispose();
     super.dispose();
   }
 
@@ -161,6 +165,10 @@ class _WorldSessionCardState extends State<_WorldSessionCard> {
                   controller: _maxIncidents,
                 ),
                 _SmallNumberField(label: 'Retorno s', controller: _grace),
+                _SmallNumberField(
+                  label: 'Nota anulación',
+                  controller: _annulledScore,
+                ),
                 FilterChip(
                   label: const Text('Pantalla completa'),
                   selected: _fullscreen,
@@ -226,6 +234,7 @@ class _WorldSessionCardState extends State<_WorldSessionCard> {
         maxIncidents: int.tryParse(_maxIncidents.text) ?? 2,
         returnGraceSeconds: int.tryParse(_grace.text) ?? 10,
         strictMode: _strict,
+        annulledScore: int.tryParse(_annulledScore.text) ?? 0,
       ),
     );
   }
@@ -243,8 +252,8 @@ class _LiveAttemptTile extends StatelessWidget {
   final AssessmentLiveAttempt attempt;
 
   @override
-  Widget build(BuildContext context) => ListTile(
-    contentPadding: EdgeInsets.zero,
+  Widget build(BuildContext context) => ExpansionTile(
+    tilePadding: EdgeInsets.zero,
     leading: CircleAvatar(child: Text('${attempt.answeredQuestions}')),
     title: Text(attempt.studentName),
     subtitle: Text(
@@ -256,6 +265,37 @@ class _LiveAttemptTile extends StatelessWidget {
             child: const Text('REACTIVAR'),
           )
         : null,
+    childrenPadding: const EdgeInsets.only(left: 56, right: 8, bottom: 8),
+    children: [
+      if (attempt.annulledReason != null)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Motivo: ${attempt.annulledReason}',
+            style: const TextStyle(color: Colors.orangeAccent),
+          ),
+        ),
+      if (attempt.events.isEmpty)
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Sin eventos registrados.',
+            style: TextStyle(color: Color(0xFF94A3B8)),
+          ),
+        )
+      else
+        ...attempt.events.map(
+          (event) => ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(_eventIcon(event.type), size: 18),
+            title: Text(_eventLabel(event.type)),
+            subtitle: Text(
+              '${event.occurredAt.toLocal()} • ${event.message}${event.answeredQuestions == null ? '' : ' • ${event.answeredQuestions}/${event.totalQuestions} respondidas'}${event.score == null ? '' : ' • nota ${event.score}'}',
+            ),
+          ),
+        ),
+    ],
   );
 
   Future<void> _reactivate(BuildContext context) async {
@@ -290,6 +330,34 @@ class _LiveAttemptTile extends StatelessWidget {
     );
   }
 }
+
+IconData _eventIcon(String type) => switch (type) {
+  'fullscreen_exit' ||
+  'focus_lost' ||
+  'visibility_hidden' ||
+  'blocked_key' ||
+  'pagehide' => Icons.warning_amber_rounded,
+  'annulled' || 'expired' => Icons.gpp_bad_rounded,
+  'reactivated' => Icons.restart_alt_rounded,
+  'submitted' => Icons.flag_rounded,
+  'progress' => Icons.edit_note_rounded,
+  _ => Icons.info_outline,
+};
+
+String _eventLabel(String type) => switch (type) {
+  'fullscreen_exit' => 'Salida de pantalla completa',
+  'focus_lost' => 'Pérdida de foco',
+  'visibility_hidden' => 'Cambio de pestaña',
+  'blocked_key' => 'Tecla bloqueada',
+  'pagehide' => 'Salida o recarga',
+  'annulled' => 'Anulación',
+  'expired' => 'Tiempo agotado',
+  'reactivated' => 'Reactivación',
+  'submitted' => 'Entrega',
+  'progress' => 'Progreso',
+  'started' => 'Inicio',
+  _ => type,
+};
 
 class _SmallNumberField extends StatelessWidget {
   const _SmallNumberField({required this.label, required this.controller});

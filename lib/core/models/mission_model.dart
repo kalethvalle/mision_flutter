@@ -16,6 +16,23 @@ enum MissionCategory {
   }
 }
 
+enum MissionSelectionType {
+  single('single'),
+  multiple('multiple');
+
+  const MissionSelectionType(this.wireName);
+
+  final String wireName;
+
+  static MissionSelectionType fromWireName(String value) {
+    return values.firstWhere(
+      (type) => type.wireName == value,
+      orElse: () =>
+          throw FormatException('Tipo de selección no compatible: $value'),
+    );
+  }
+}
+
 class MissionOption {
   const MissionOption({
     required this.id,
@@ -56,6 +73,7 @@ class MissionModel {
     required this.category,
     required this.codeTemplate,
     required this.targetPlaceholder,
+    required this.selectionType,
     required this.options,
     required this.previewType,
   });
@@ -72,6 +90,7 @@ class MissionModel {
   final MissionCategory category;
   final List<String> codeTemplate;
   final String targetPlaceholder;
+  final MissionSelectionType selectionType;
   final List<MissionOption> options;
   final String previewType;
 
@@ -89,6 +108,11 @@ class MissionModel {
       category: MissionCategory.fromWireName(json.string('category')),
       codeTemplate: json.stringList('codeTemplate'),
       targetPlaceholder: json.string('targetPlaceholder'),
+      selectionType: MissionSelectionType.fromWireName(
+        json['selectionType'] is String
+            ? json['selectionType']! as String
+            : 'single',
+      ),
       options: json.objectList('options').map(MissionOption.fromJson).toList(),
       previewType: json.string('previewType'),
     );
@@ -107,6 +131,7 @@ class MissionModel {
     'category': category.wireName,
     'codeTemplate': codeTemplate,
     'targetPlaceholder': targetPlaceholder,
+    'selectionType': selectionType.wireName,
     'options': options.map((option) => option.toJson()).toList(),
     'previewType': previewType,
   };

@@ -103,7 +103,7 @@ class SqliteProgressStore implements ProgressStore, TrainingStore {
   Future<AnswerCheckResult> checkAndRecord({
     required String userId,
     required String missionId,
-    required String optionId,
+    required List<String> optionIds,
     required bool hintUsed,
   }) async {
     late bool correct;
@@ -123,25 +123,46 @@ class SqliteProgressStore implements ProgressStore, TrainingStore {
         );
       }
 
+      final selected = optionIds.toSet();
       final optionRows = _database.select(
         '''
-        SELECT mo.is_correct, m.content_version
+        SELECT mo.id, mo.is_correct, m.content_version, m.selection_type
         FROM mission_options mo
         JOIN missions m ON m.id = mo.mission_id
-        WHERE mo.mission_id = ? AND mo.id = ? AND m.status = 'published'
+        WHERE mo.mission_id = ?
+          AND m.status = 'published'
+          AND mo.is_active = 1
       ''',
-        [missionId, optionId],
+        [missionId],
       );
-      if (optionRows.isEmpty) {
+      if (optionRows.isEmpty ||
+          !selected.every(
+            (optionId) => optionRows.any((row) => row['id'] == optionId),
+          )) {
         throw const CatalogException(
           'invalid_option',
           'La opción no pertenece a la misión indicada.',
         );
       }
 
-      final row = optionRows.single;
-      correct = row['is_correct'] == 1;
+      final firstRow = optionRows.first;
+      final selectionType = firstRow['selection_type']! as String;
+      if (selectionType == 'single' && selected.length != 1) {
+        throw const CatalogException(
+          'invalid_option',
+          'Esta misión requiere seleccionar una sola opción.',
+        );
+      }
+      final correctOptions = optionRows
+          .where((row) => row['is_correct'] == 1)
+          .map((row) => row['id']! as String)
+          .toSet();
+      correct =
+          selected.length == correctOptions.length &&
+          selected.every(correctOptions.contains);
       final attemptedAt = _clock().toUtc().toIso8601String();
+      final attemptId = _tokenService.newId();
+      final legacySelectedOptionId = selected.first;
       _database.execute(
         '''
         INSERT INTO training_attempts(
@@ -150,16 +171,25 @@ class SqliteProgressStore implements ProgressStore, TrainingStore {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ''',
         [
-          _tokenService.newId(),
+          attemptId,
           userId,
           missionId,
-          optionId,
+          legacySelectedOptionId,
           correct ? 1 : 0,
           hintUsed ? 1 : 0,
           attemptedAt,
-          row['content_version']! as int,
+          firstRow['content_version']! as int,
         ],
       );
+      for (final optionId in selected) {
+        _database.execute(
+          '''
+          INSERT INTO training_attempt_options(attempt_id, mission_id, option_id)
+          VALUES (?, ?, ?)
+        ''',
+          [attemptId, missionId, optionId],
+        );
+      }
 
       if (correct) {
         _database.execute(

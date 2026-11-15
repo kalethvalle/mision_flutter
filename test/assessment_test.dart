@@ -235,6 +235,7 @@ void main() {
           maxIncidents: 2,
           returnGraceSeconds: 10,
           strictMode: true,
+          annulledScore: 0,
         ),
       );
       final session = await assessments.openSession(teacher, 'world_1');
@@ -295,7 +296,7 @@ Future<void> _completeWorldOne(ProgressService progress, UserModel user) async {
     await progress.checkAnswer(
       user: user,
       missionId: mission.id,
-      optionId: correct.id,
+      optionIds: [correct.id],
       hintUsed: false,
     );
   }

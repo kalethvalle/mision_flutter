@@ -146,6 +146,7 @@ class AuthoringMission {
     required this.category,
     required this.codeTemplate,
     required this.targetPlaceholder,
+    required this.selectionType,
     required this.previewType,
     required this.sortOrder,
     required this.status,
@@ -164,6 +165,7 @@ class AuthoringMission {
   final MissionCategory category;
   final List<String> codeTemplate;
   final String targetPlaceholder;
+  final MissionSelectionType selectionType;
   final String previewType;
   final int sortOrder;
   final ContentStatus status;
@@ -183,6 +185,9 @@ class AuthoringMission {
         category: MissionCategory.fromWireName(json.text('category')),
         codeTemplate: json.textList('codeTemplate'),
         targetPlaceholder: json.text('targetPlaceholder'),
+        selectionType: MissionSelectionType.fromWireName(
+          json.optionalString('selectionType') ?? 'single',
+        ),
         previewType: json.text('previewType'),
         sortOrder: json.integer('sortOrder'),
         status: ContentStatus.fromWireName(json.text('status')),
@@ -205,6 +210,7 @@ class AuthoringMission {
     'category': category.wireName,
     'codeTemplate': codeTemplate,
     'targetPlaceholder': targetPlaceholder,
+    'selectionType': selectionType.wireName,
     'previewType': previewType,
     'sortOrder': sortOrder,
     'status': status.wireName,

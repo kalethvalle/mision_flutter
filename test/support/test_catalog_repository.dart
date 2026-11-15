@@ -65,6 +65,7 @@ class TestCatalogRepository implements FlutterQuestRepository {
           category: MissionCategory.fromWireName(mission.category),
           codeTemplate: mission.codeTemplate,
           targetPlaceholder: mission.targetPlaceholder,
+          selectionType: MissionSelectionType.single,
           previewType: mission.previewType,
           sortOrder: mission.sortOrder,
           status: ContentStatus.published,
@@ -117,6 +118,7 @@ class TestCatalogRepository implements FlutterQuestRepository {
         category: MissionCategory.fromWireName(mission.category),
         codeTemplate: mission.codeTemplate,
         targetPlaceholder: mission.targetPlaceholder,
+        selectionType: MissionSelectionType.single,
         options: mission.options
             .map(
               (option) => MissionOption(
@@ -183,7 +185,7 @@ class TestCatalogRepository implements FlutterQuestRepository {
   @override
   Future<AnswerCheckResult> checkMissionAnswer(
     String missionId,
-    String optionId, {
+    List<String> optionIds, {
     required bool hintUsed,
   }) async {
     _failWhenConfigured();
@@ -192,15 +194,18 @@ class TestCatalogRepository implements FlutterQuestRepository {
       throw const CatalogException('mission_not_found', 'Misión inexistente.');
     }
     final mission = seedMissions.singleWhere((item) => item.id == missionId);
-    if (!mission.options.any((item) => item.id == optionId)) {
+    if (optionIds.any(
+      (optionId) => !mission.options.any((item) => item.id == optionId),
+    )) {
       throw const CatalogException('invalid_option', 'Opción inválida.');
     }
     lastHintUsed = hintUsed;
-    if (optionId == correct) completedMissionIds.add(missionId);
+    final isCorrect = optionIds.length == 1 && optionIds.single == correct;
+    if (isCorrect) completedMissionIds.add(missionId);
     return AnswerCheckResult(
       missionId: missionId,
-      isCorrect: optionId == correct,
-      message: optionId == correct ? 'Correcta' : 'Incorrecta',
+      isCorrect: isCorrect,
+      message: isCorrect ? 'Correcta' : 'Incorrecta',
       progress: await getProgress(),
     );
   }
@@ -380,6 +385,7 @@ class TestCatalogRepository implements FlutterQuestRepository {
       category: mission.category,
       codeTemplate: mission.codeTemplate,
       targetPlaceholder: mission.targetPlaceholder,
+      selectionType: mission.selectionType,
       previewType: mission.previewType,
       sortOrder: mission.sortOrder,
       status: mission.status,
@@ -617,6 +623,7 @@ class TestCatalogRepository implements FlutterQuestRepository {
       submittedAt: submittedAt,
       topics: topics,
       reviews: reviews,
+      status: AssessmentAttemptStatus.submitted,
     );
     _assessmentResults[attemptId] = result;
     _assessmentHistory.insert(
@@ -772,4 +779,5 @@ AssessmentWorldSettings _testSettings(String worldId) =>
       maxIncidents: 2,
       returnGraceSeconds: 10,
       strictMode: true,
+      annulledScore: 0,
     );

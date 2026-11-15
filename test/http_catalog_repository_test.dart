@@ -38,8 +38,10 @@ void main() {
         );
       }
       if (request.url.path == '/api/v1/missions/w1_m1/check') {
-        final optionId =
-            (jsonDecode(request.body) as Map<String, Object?>)['optionId'];
+        final optionIds =
+            (jsonDecode(request.body) as Map<String, Object?>)['optionIds']
+                as List<Object?>;
+        final optionId = optionIds.single;
         return http.Response(
           jsonEncode({
             'result': {
@@ -68,11 +70,9 @@ void main() {
     expect(await repository.listWorlds(), hasLength(2));
     expect(await repository.listWorldMissions('world_1'), hasLength(5));
     expect(
-      (await repository.checkMissionAnswer(
-        'w1_m1',
+      (await repository.checkMissionAnswer('w1_m1', const [
         'int',
-        hintUsed: false,
-      )).isCorrect,
+      ], hintUsed: false)).isCorrect,
       isTrue,
     );
     expect(requests, [
