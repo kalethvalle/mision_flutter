@@ -7,6 +7,7 @@ import '../../../core/models/assessment_model.dart';
 import '../../../core/models/authoring_model.dart';
 import '../../../core/store/assessment_store.dart';
 import '../../../core/store/authoring_store.dart';
+import 'teacher_ux_components.dart';
 
 class AssessmentSessionView extends StatefulWidget {
   const AssessmentSessionView({super.key});
@@ -37,17 +38,77 @@ class _AssessmentSessionViewState extends State<AssessmentSessionView> {
     final store = context.watch<AssessmentSessionStore>();
     final authoring = context.watch<AuthoringStore>();
     final overview = store.overview;
+    final activeSessions =
+        overview?.sessions
+            .where((item) => item.status == AssessmentSessionStatus.open)
+            .length ??
+        0;
+    final liveAttempts =
+        overview?.sessions.fold<int>(
+          0,
+          (total, session) => total + session.attempts.length,
+        ) ??
+        0;
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        Text(
-          'Parciales controlados',
-          style: Theme.of(context).textTheme.headlineSmall
-              ?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const Text(
-          'Activa el parcial por mundo, controla el tiempo y revisa incidentes en vivo.',
-          style: TextStyle(color: Color(0xFF94A3B8)),
+        TeacherPageHeader(
+          icon: Icons.timer,
+          title: 'Parciales controlados',
+          subtitle: 'Configura una vez, activa cuando el grupo esté listo y monitorea progreso e incidentes sin ver respuestas.',
+          footer: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TeacherMetricStrip(
+                items: [
+                  TeacherMetricItem(
+                    icon: Icons.public,
+                    label: 'Mundos',
+                    value: '${authoring.worlds.length}',
+                  ),
+                  TeacherMetricItem(
+                    icon: Icons.play_circle,
+                    label: 'Sesiones activas',
+                    value: '$activeSessions',
+                    color: activeSessions > 0 ? teacherSuccess : teacherAccent,
+                  ),
+                  TeacherMetricItem(
+                    icon: Icons.groups,
+                    label: 'Estudiantes en vivo',
+                    value: '$liveAttempts',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const TeacherWorkflow(
+                steps: [
+                  TeacherWorkflowStep(
+                    icon: Icons.tune,
+                    title: 'Configurar',
+                    description:
+                        'Define tiempo, modo estricto y nota por anulación.',
+                  ),
+                  TeacherWorkflowStep(
+                    icon: Icons.play_arrow,
+                    title: 'Activar',
+                    description:
+                        'Abre el parcial cuando el grupo esté preparado.',
+                  ),
+                  TeacherWorkflowStep(
+                    icon: Icons.visibility,
+                    title: 'Monitorear',
+                    description:
+                        'Observa progreso e incidentes en tiempo real.',
+                  ),
+                  TeacherWorkflowStep(
+                    icon: Icons.stop_circle,
+                    title: 'Cerrar',
+                    description: 'Evita nuevos ingresos y revisa resultados.',
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
         if (store.error != null) ...[
           const SizedBox(height: 12),

@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:mision_flutter/application/catalog/catalog_service.dart';
+import 'package:mision_flutter/application/analytics/analytics_service.dart';
 import 'package:mision_flutter/application/authoring/authoring_service.dart';
 import 'package:mision_flutter/application/assessment/assessment_service.dart';
 import 'package:mision_flutter/application/identity/identity_service.dart';
 import 'package:mision_flutter/application/progress/progress_service.dart';
 import 'package:mision_flutter/server/api/api_security.dart';
+import 'package:mision_flutter/server/api/analytics_api.dart';
 import 'package:mision_flutter/server/api/authoring_api.dart';
 import 'package:mision_flutter/server/api/assessment_api.dart';
 import 'package:mision_flutter/server/api/app_api.dart';
@@ -15,6 +17,7 @@ import 'package:mision_flutter/server/api/identity_api.dart';
 import 'package:mision_flutter/server/api/training_api.dart';
 import 'package:mision_flutter/server/database/catalog_database.dart';
 import 'package:mision_flutter/server/repositories/sqlite_catalog_repository.dart';
+import 'package:mision_flutter/server/repositories/sqlite_analytics_store.dart';
 import 'package:mision_flutter/server/repositories/sqlite_authoring_store.dart';
 import 'package:mision_flutter/server/repositories/sqlite_assessment_store.dart';
 import 'package:mision_flutter/server/repositories/sqlite_identity_store.dart';
@@ -32,6 +35,7 @@ Future<void> main(List<String> arguments) async {
     final progressStore = SqliteProgressStore(catalogDatabase.database);
     final authoringStore = SqliteAuthoringStore(catalogDatabase.database);
     final assessmentStore = SqliteAssessmentStore(catalogDatabase.database);
+    final analyticsStore = SqliteAnalyticsStore(catalogDatabase.database);
     final identityService = IdentityService(identityStore);
     final security = ApiSecurity(identityService);
     final apiHandler = createApiHandler(
@@ -54,6 +58,10 @@ Future<void> main(List<String> arguments) async {
       ),
       assessmentApi: AssessmentApi(
         assessmentService: AssessmentService(assessmentStore),
+        security: security,
+      ),
+      analyticsApi: AnalyticsApi(
+        analyticsService: AnalyticsService(analyticsStore),
         security: security,
       ),
     );

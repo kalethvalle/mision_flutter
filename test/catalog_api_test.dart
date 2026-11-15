@@ -2,12 +2,14 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mision_flutter/application/analytics/analytics_service.dart';
 import 'package:mision_flutter/application/catalog/catalog_service.dart';
 import 'package:mision_flutter/application/authoring/authoring_service.dart';
 import 'package:mision_flutter/application/assessment/assessment_service.dart';
 import 'package:mision_flutter/application/identity/identity_service.dart';
 import 'package:mision_flutter/application/progress/progress_service.dart';
 import 'package:mision_flutter/server/api/api_security.dart';
+import 'package:mision_flutter/server/api/analytics_api.dart';
 import 'package:mision_flutter/server/api/authoring_api.dart';
 import 'package:mision_flutter/server/api/assessment_api.dart';
 import 'package:mision_flutter/server/api/app_api.dart';
@@ -16,6 +18,7 @@ import 'package:mision_flutter/server/api/identity_api.dart';
 import 'package:mision_flutter/server/api/training_api.dart';
 import 'package:mision_flutter/server/database/catalog_database.dart';
 import 'package:mision_flutter/server/repositories/sqlite_catalog_repository.dart';
+import 'package:mision_flutter/server/repositories/sqlite_analytics_store.dart';
 import 'package:mision_flutter/server/repositories/sqlite_authoring_store.dart';
 import 'package:mision_flutter/server/repositories/sqlite_assessment_store.dart';
 import 'package:mision_flutter/server/repositories/sqlite_identity_store.dart';
@@ -41,6 +44,7 @@ void main() {
     final progress = SqliteProgressStore(database.database);
     final authoring = SqliteAuthoringStore(database.database);
     final assessments = SqliteAssessmentStore(database.database);
+    final analytics = SqliteAnalyticsStore(database.database);
     api = createApiHandler(
       identityApi: IdentityApi(identityService: identity, security: security),
       catalogApi: CatalogApi(
@@ -58,6 +62,10 @@ void main() {
       ),
       assessmentApi: AssessmentApi(
         assessmentService: AssessmentService(assessments),
+        security: security,
+      ),
+      analyticsApi: AnalyticsApi(
+        analyticsService: AnalyticsService(analytics),
         security: security,
       ),
     );
@@ -184,6 +192,41 @@ void main() {
     expect(attempts.first['hint_used'], 1);
     expect(attempts.last['is_correct'], 1);
   });
+
+  test(
+    'métricas docentes se recalculan desde intentos de entrenamiento',
+    () async {
+      final teacherCookie = await _bootstrapTeacher(api);
+      final studentCookie = await _createAndLoginStudent(api, teacherCookie);
+      final response = await api(
+        _post('/api/v1/missions/w1_m1/check', {
+          'optionId': 'int',
+          'hintUsed': false,
+        }, cookie: studentCookie),
+      );
+      expect(response.statusCode, 200);
+      expect(
+        (await api(
+          _request('GET', '/api/v1/analytics/dashboard', cookie: studentCookie),
+        )).statusCode,
+        403,
+      );
+
+      final refresh = await api(
+        _post('/api/v1/analytics/refresh', const {}, cookie: teacherCookie),
+      );
+      expect(refresh.statusCode, 200);
+      final dashboard =
+          (jsonDecode(await refresh.readAsString())
+                  as Map<String, Object?>)['dashboard']!
+              as Map<String, Object?>;
+      final summary = dashboard['summary']! as Map<String, Object?>;
+      expect(summary['totalStudents'], 1);
+      expect(summary['activeStudents'], 1);
+      expect(summary['trainingAttempts'], 1);
+      expect(summary['trainingAccuracy'], 100);
+    },
+  );
 
   test('protege autoría y devuelve validaciones de publicación', () async {
     expect((await api(_request('GET', '/api/v1/authoring'))).statusCode, 401);

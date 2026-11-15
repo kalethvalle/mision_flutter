@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/models/authoring_model.dart';
 import '../../../core/models/mission_model.dart';
 import '../../../core/store/authoring_store.dart';
+import 'teacher_ux_components.dart';
 
 class ContentAuthoringView extends StatelessWidget {
   const ContentAuthoringView({super.key});
@@ -17,12 +18,22 @@ class ContentAuthoringView extends StatelessWidget {
     if (store.state == AuthoringState.failure) {
       return _LoadFailure(message: store.error, retry: store.load);
     }
+    final publishedWorlds = store.worlds
+        .where((item) => item.status == ContentStatus.published)
+        .length;
+    final publishedTopics = store.topics
+        .where((item) => item.status == ContentStatus.published)
+        .length;
+    final publishedMissions = store.missions
+        .where((item) => item.status == ContentStatus.published)
+        .length;
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        _ActionBar(
+        TeacherPageHeader(
+          icon: Icons.edit_note,
           title: 'Editor de contenido',
-          subtitle: 'Mundos, temas y misiones basadas en plantillas seguras.',
+          subtitle: 'Construye la ruta de aprendizaje en orden: mundo, tema y misión. Publica solo cuando el contenido esté listo para estudiantes.',
           actions: [
             FilledButton.icon(
               onPressed: () => _showWorld(context, store),
@@ -44,6 +55,52 @@ class ContentAuthoringView extends StatelessWidget {
               label: const Text('NUEVA MISIÓN'),
             ),
           ],
+          footer: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TeacherMetricStrip(
+                items: [
+                  TeacherMetricItem(
+                    icon: Icons.public,
+                    label: 'Mundos publicados',
+                    value: '$publishedWorlds/${store.worlds.length}',
+                    color: teacherSuccess,
+                  ),
+                  TeacherMetricItem(
+                    icon: Icons.category,
+                    label: 'Temas publicados',
+                    value: '$publishedTopics/${store.topics.length}',
+                  ),
+                  TeacherMetricItem(
+                    icon: Icons.extension,
+                    label: 'Misiones publicadas',
+                    value: '$publishedMissions/${store.missions.length}',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const TeacherWorkflow(
+                steps: [
+                  TeacherWorkflowStep(
+                    icon: Icons.public,
+                    title: 'Mundo',
+                    description: 'Define la unidad principal y su orden.',
+                  ),
+                  TeacherWorkflowStep(
+                    icon: Icons.category,
+                    title: 'Tema',
+                    description:
+                        'Agrupa un concepto concreto dentro del mundo.',
+                  ),
+                  TeacherWorkflowStep(
+                    icon: Icons.extension,
+                    title: 'Misión',
+                    description: 'Escribe contexto, pasos, opciones y pista.',
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 20),
         _Section(
@@ -142,12 +199,22 @@ class QuestionBankView extends StatelessWidget {
     if (store.state == AuthoringState.failure) {
       return _LoadFailure(message: store.error, retry: store.load);
     }
+    final publishedQuestions = store.questions
+        .where((item) => item.status == ContentStatus.published)
+        .length;
+    final singleQuestions = store.questions
+        .where((item) => item.type == QuestionType.single)
+        .length;
+    final multipleQuestions = store.questions
+        .where((item) => item.type == QuestionType.multiple)
+        .length;
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        _ActionBar(
+        TeacherPageHeader(
+          icon: Icons.quiz,
           title: 'Banco de preguntas',
-          subtitle: 'Preguntas versionadas para los parciales de cada tema.',
+          subtitle: 'Crea preguntas por tema para que el parcial tome una foto estable del contenido publicado.',
           actions: [
             FilledButton.icon(
               onPressed: store.topics.isEmpty
@@ -163,6 +230,36 @@ class QuestionBankView extends StatelessWidget {
               label: const Text('NUEVA PREGUNTA'),
             ),
           ],
+          footer: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TeacherMetricStrip(
+                items: [
+                  TeacherMetricItem(
+                    icon: Icons.published_with_changes,
+                    label: 'Publicadas',
+                    value: '$publishedQuestions/${store.questions.length}',
+                    color: teacherSuccess,
+                  ),
+                  TeacherMetricItem(
+                    icon: Icons.radio_button_checked,
+                    label: 'Selección única',
+                    value: '$singleQuestions',
+                  ),
+                  TeacherMetricItem(
+                    icon: Icons.check_box,
+                    label: 'Selección múltiple',
+                    value: '$multipleQuestions',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const TeacherNote(
+                icon: Icons.rule,
+                text: 'Para publicar una pregunta: elige mundo y tema, escribe el enunciado, define si es única o múltiple, agrega opciones y marca las correctas.',
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 20),
         _Section(
@@ -705,43 +802,6 @@ class _EditorDialog extends StatelessWidget {
         ),
       ],
     ),
-  );
-}
-
-class _ActionBar extends StatelessWidget {
-  const _ActionBar({
-    required this.title,
-    required this.subtitle,
-    required this.actions,
-  });
-
-  final String title;
-  final String subtitle;
-  final List<Widget> actions;
-
-  @override
-  Widget build(BuildContext context) => Wrap(
-    alignment: WrapAlignment.spaceBetween,
-    crossAxisAlignment: WrapCrossAlignment.center,
-    runSpacing: 12,
-    spacing: 20,
-    children: [
-      ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            Text(subtitle, style: const TextStyle(color: Color(0xFF94A3B8))),
-          ],
-        ),
-      ),
-      Wrap(spacing: 8, runSpacing: 8, children: actions),
-    ],
   );
 }
 

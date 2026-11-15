@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../../../core/models/user_model.dart';
 import '../../../core/store/session_store.dart';
+import 'analytics_dashboard_view.dart';
 import 'assessment_session_view.dart';
 import 'authoring_view.dart';
 import 'report_view.dart';
+import 'teacher_ux_components.dart';
 
 class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
@@ -35,7 +37,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
         .where((user) => user.role == UserRole.student)
         .toList();
     return DefaultTabController(
-      length: 5,
+      length: 6,
       child: Scaffold(
         backgroundColor: const Color(0xFF0F172A),
         appBar: AppBar(
@@ -56,6 +58,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
               Tab(icon: Icon(Icons.quiz), text: 'PREGUNTAS'),
               Tab(icon: Icon(Icons.timer), text: 'PARCIALES'),
               Tab(icon: Icon(Icons.analytics), text: 'RESULTADOS'),
+              Tab(icon: Icon(Icons.query_stats), text: 'MÉTRICAS'),
             ],
           ),
         ),
@@ -73,6 +76,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
             const QuestionBankView(),
             const AssessmentSessionView(),
             const ReportView(),
+            const AnalyticsDashboardView(),
           ],
         ),
       ),
@@ -125,18 +129,74 @@ class _StudentsPanel extends StatelessWidget {
         onSubmit: onSubmit,
       );
       final list = _StudentList(students: students);
+      final header = TeacherPageHeader(
+        icon: Icons.school,
+        title: 'Operación docente',
+        subtitle: 'Prepara la clase en una ruta corta: estudiantes, contenido, preguntas, parcial y revisión.',
+        footer: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TeacherMetricStrip(
+              items: [
+                TeacherMetricItem(
+                  icon: Icons.people,
+                  label: 'Estudiantes inscritos',
+                  value: '${students.length}',
+                ),
+                const TeacherMetricItem(
+                  icon: Icons.route,
+                  label: 'Ruta recomendada',
+                  value: '5 pasos',
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            const TeacherWorkflow(
+              steps: [
+                TeacherWorkflowStep(
+                  icon: Icons.person_add_alt,
+                  title: 'Inscribir',
+                  description: 'Crea estudiantes antes de abrir actividades.',
+                ),
+                TeacherWorkflowStep(
+                  icon: Icons.edit_note,
+                  title: 'Diseñar',
+                  description: 'Publica mundos, temas y misiones completas.',
+                ),
+                TeacherWorkflowStep(
+                  icon: Icons.quiz,
+                  title: 'Evaluar',
+                  description: 'Crea preguntas y activa parciales por mundo.',
+                ),
+                TeacherWorkflowStep(
+                  icon: Icons.insights,
+                  title: 'Mejorar',
+                  description: 'Revisa resultados, incidentes y métricas.',
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
       return SingleChildScrollView(
         padding: const EdgeInsets.all(24),
-        child: compact
-            ? Column(children: [form, const SizedBox(height: 24), list])
-            : Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(flex: 4, child: form),
-                  const SizedBox(width: 24),
-                  Expanded(flex: 6, child: list),
-                ],
-              ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            header,
+            const SizedBox(height: 24),
+            compact
+                ? Column(children: [form, const SizedBox(height: 24), list])
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 4, child: form),
+                      const SizedBox(width: 24),
+                      Expanded(flex: 6, child: list),
+                    ],
+                  ),
+          ],
+        ),
       );
     },
   );

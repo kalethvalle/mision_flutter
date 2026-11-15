@@ -1,4 +1,5 @@
 import '../models/answer_check_result.dart';
+import '../models/analytics_model.dart';
 import '../models/assessment_model.dart';
 import '../models/authoring_model.dart';
 import '../models/mission_model.dart';
@@ -109,6 +110,12 @@ abstract interface class AssessmentRepository {
   Future<AssessmentDetailReport> getAssessmentDetailReport(String attemptId);
 }
 
+abstract interface class AnalyticsRepository {
+  Future<AnalyticsDashboard> getAnalyticsDashboard();
+
+  Future<AnalyticsDashboard> refreshAnalyticsDashboard();
+}
+
 abstract interface class FlutterQuestRepository
     implements
         CatalogRepository,
@@ -116,7 +123,8 @@ abstract interface class FlutterQuestRepository
         IdentityRepository,
         ProgressRepository,
         AuthoringRepository,
-        AssessmentRepository {}
+        AssessmentRepository,
+        AnalyticsRepository {}
 
 class CatalogException implements Exception {
   const CatalogException(this.code, this.message);

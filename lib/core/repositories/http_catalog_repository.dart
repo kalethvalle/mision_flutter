@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/answer_check_result.dart';
+import '../models/analytics_model.dart';
 import '../models/assessment_model.dart';
 import '../models/authoring_model.dart';
 import '../models/mission_model.dart';
@@ -312,6 +313,18 @@ class HttpCatalogRepository implements FlutterQuestRepository {
       'reports/assessments/${Uri.encodeComponent(attemptId)}',
     );
     return AssessmentDetailReport.fromJson(_object(json, 'report'));
+  }
+
+  @override
+  Future<AnalyticsDashboard> getAnalyticsDashboard() async {
+    final json = await _get('analytics/dashboard');
+    return AnalyticsDashboard.fromJson(_object(json, 'dashboard'));
+  }
+
+  @override
+  Future<AnalyticsDashboard> refreshAnalyticsDashboard() async {
+    final json = await _post('analytics/refresh', const {});
+    return AnalyticsDashboard.fromJson(_object(json, 'dashboard'));
   }
 
   Future<Map<String, Object?>> _get(String path) async {

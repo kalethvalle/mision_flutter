@@ -42,6 +42,7 @@ class CatalogDatabase {
     if (!_migrationApplied(4)) _applyMigrationFour();
     if (!_migrationApplied(5)) _applyMigrationFive();
     if (!_migrationApplied(6)) _applyMigrationSix();
+    if (!_migrationApplied(7)) _applyMigrationSeven();
     _seedCatalog();
   }
 
@@ -492,6 +493,214 @@ class CatalogDatabase {
         [6, now],
       );
     });
+  }
+
+  void _applyMigrationSeven() {
+    _transaction(() {
+      final now = DateTime.now().toUtc().toIso8601String();
+      database.execute('''
+        CREATE TABLE IF NOT EXISTS dw_dim_student (
+          student_id TEXT PRIMARY KEY,
+          username TEXT NOT NULL,
+          display_name TEXT NOT NULL,
+          is_active INTEGER NOT NULL CHECK (is_active IN (0, 1)),
+          created_at TEXT NOT NULL
+        )
+      ''');
+      database.execute('''
+        CREATE TABLE IF NOT EXISTS dw_dim_world (
+          world_id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          sort_order INTEGER NOT NULL,
+          status TEXT NOT NULL
+        )
+      ''');
+      database.execute('''
+        CREATE TABLE IF NOT EXISTS dw_dim_topic (
+          topic_id TEXT PRIMARY KEY,
+          world_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          sort_order INTEGER NOT NULL,
+          status TEXT NOT NULL
+        )
+      ''');
+      database.execute('''
+        CREATE TABLE IF NOT EXISTS dw_dim_mission (
+          mission_id TEXT PRIMARY KEY,
+          world_id TEXT NOT NULL,
+          topic_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          sort_order INTEGER NOT NULL,
+          status TEXT NOT NULL,
+          content_version INTEGER NOT NULL
+        )
+      ''');
+      database.execute('''
+        CREATE TABLE IF NOT EXISTS dw_dim_date (
+          date_key INTEGER PRIMARY KEY,
+          date_text TEXT NOT NULL UNIQUE,
+          year INTEGER NOT NULL,
+          month INTEGER NOT NULL,
+          day INTEGER NOT NULL,
+          week_label TEXT NOT NULL
+        )
+      ''');
+      database.execute('''
+        CREATE TABLE IF NOT EXISTS dw_fact_training_attempt (
+          attempt_id TEXT PRIMARY KEY,
+          student_id TEXT NOT NULL,
+          world_id TEXT NOT NULL,
+          topic_id TEXT NOT NULL,
+          mission_id TEXT NOT NULL,
+          date_key INTEGER NOT NULL,
+          attempted_at TEXT NOT NULL,
+          is_correct INTEGER NOT NULL CHECK (is_correct IN (0, 1)),
+          hint_used INTEGER NOT NULL CHECK (hint_used IN (0, 1))
+        )
+      ''');
+      database.execute('''
+        CREATE TABLE IF NOT EXISTS dw_fact_assessment_attempt (
+          attempt_id TEXT PRIMARY KEY,
+          student_id TEXT NOT NULL,
+          world_id TEXT NOT NULL,
+          date_key INTEGER NOT NULL,
+          started_at TEXT NOT NULL,
+          finished_at TEXT NOT NULL,
+          status TEXT NOT NULL,
+          score INTEGER NOT NULL,
+          passed INTEGER NOT NULL CHECK (passed IN (0, 1)),
+          correct_answers INTEGER NOT NULL,
+          total_questions INTEGER NOT NULL,
+          incidents INTEGER NOT NULL,
+          reactivation_count INTEGER NOT NULL
+        )
+      ''');
+      database.execute('''
+        CREATE TABLE IF NOT EXISTS dw_fact_assessment_topic_score (
+          attempt_id TEXT NOT NULL,
+          student_id TEXT NOT NULL,
+          world_id TEXT NOT NULL,
+          topic_id TEXT NOT NULL,
+          date_key INTEGER NOT NULL,
+          correct_answers INTEGER NOT NULL,
+          total_questions INTEGER NOT NULL,
+          score INTEGER NOT NULL,
+          PRIMARY KEY(attempt_id, topic_id)
+        )
+      ''');
+      database.execute('''
+        CREATE TABLE IF NOT EXISTS dw_fact_integrity_event (
+          event_id TEXT PRIMARY KEY,
+          student_id TEXT,
+          world_id TEXT,
+          attempt_id TEXT,
+          session_id TEXT NOT NULL,
+          date_key INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          score INTEGER,
+          occurred_at TEXT NOT NULL
+        )
+      ''');
+      database.execute('''
+        CREATE TABLE IF NOT EXISTS dw_refresh_state (
+          id TEXT PRIMARY KEY,
+          refreshed_at TEXT NOT NULL,
+          source_event_count INTEGER NOT NULL,
+          note TEXT NOT NULL
+        )
+      ''');
+      database.execute('''
+        CREATE TABLE IF NOT EXISTS analytics_audit_log (
+          id TEXT PRIMARY KEY,
+          table_name TEXT NOT NULL,
+          row_id TEXT NOT NULL,
+          operation TEXT NOT NULL,
+          occurred_at TEXT NOT NULL
+        )
+      ''');
+      database.execute('''
+        CREATE INDEX IF NOT EXISTS idx_dw_training_student
+        ON dw_fact_training_attempt(student_id, attempted_at)
+      ''');
+      database.execute('''
+        CREATE INDEX IF NOT EXISTS idx_dw_assessment_student
+        ON dw_fact_assessment_attempt(student_id, finished_at)
+      ''');
+      database.execute('''
+        CREATE INDEX IF NOT EXISTS idx_dw_integrity_attempt
+        ON dw_fact_integrity_event(attempt_id, occurred_at)
+      ''');
+      _createAnalyticsTrigger(
+        table: 'users',
+        operation: 'INSERT',
+        rowIdExpression: 'NEW.id',
+      );
+      _createAnalyticsTrigger(
+        table: 'users',
+        operation: 'UPDATE',
+        rowIdExpression: 'NEW.id',
+      );
+      _createAnalyticsTrigger(
+        table: 'training_attempts',
+        operation: 'INSERT',
+        rowIdExpression: 'NEW.id',
+      );
+      _createAnalyticsTrigger(
+        table: 'mission_progress',
+        operation: 'INSERT',
+        rowIdExpression: "NEW.user_id || ':' || NEW.mission_id",
+      );
+      _createAnalyticsTrigger(
+        table: 'mission_progress',
+        operation: 'UPDATE',
+        rowIdExpression: "NEW.user_id || ':' || NEW.mission_id",
+      );
+      _createAnalyticsTrigger(
+        table: 'assessment_attempts',
+        operation: 'INSERT',
+        rowIdExpression: 'NEW.id',
+      );
+      _createAnalyticsTrigger(
+        table: 'assessment_attempts',
+        operation: 'UPDATE',
+        rowIdExpression: 'NEW.id',
+      );
+      _createAnalyticsTrigger(
+        table: 'assessment_attempt_events',
+        operation: 'INSERT',
+        rowIdExpression: 'NEW.id',
+      );
+      database.execute(
+        '''
+        INSERT INTO schema_migrations(version, applied_at)
+        VALUES (?, ?)
+      ''',
+        [7, now],
+      );
+    });
+  }
+
+  void _createAnalyticsTrigger({
+    required String table,
+    required String operation,
+    required String rowIdExpression,
+  }) {
+    final triggerName = 'trg_analytics_${table}_${operation.toLowerCase()}';
+    database.execute('''
+      CREATE TRIGGER IF NOT EXISTS $triggerName
+      AFTER $operation ON $table
+      BEGIN
+        INSERT INTO analytics_audit_log(
+          id, table_name, row_id, operation, occurred_at
+        ) VALUES (
+          lower(hex(randomblob(16))),
+          '$table',
+          $rowIdExpression,
+          '$operation',
+          strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+        );
+      END
+    ''');
   }
 
   bool _columnExists(String table, String column) {
