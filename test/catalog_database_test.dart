@@ -22,7 +22,7 @@ void main() {
 
   test('crea el esquema y siembra el catálogo sin duplicados', () async {
     var catalog = CatalogDatabase.open(databasePath);
-    expect(_count(catalog, 'schema_migrations'), 5);
+    expect(_count(catalog, 'schema_migrations'), 6);
     expect(_count(catalog, 'worlds'), 2);
     expect(_count(catalog, 'topics'), 9);
     expect(_count(catalog, 'missions'), 9);
@@ -59,7 +59,7 @@ void main() {
     catalog.close();
 
     catalog = CatalogDatabase.open(databasePath);
-    expect(_count(catalog, 'schema_migrations'), 5);
+    expect(_count(catalog, 'schema_migrations'), 6);
     expect(_count(catalog, 'worlds'), 2);
     expect(_count(catalog, 'topics'), 9);
     expect(_count(catalog, 'missions'), 9);
@@ -104,7 +104,7 @@ void main() {
 
     final migrated = CatalogDatabase.open(databasePath);
     addTearDown(migrated.close);
-    expect(_count(migrated, 'schema_migrations'), 5);
+    expect(_count(migrated, 'schema_migrations'), 6);
     expect(_count(migrated, 'assessment_world_settings'), 2);
     final columns = migrated.database
         .select('PRAGMA table_info(assessment_attempts)')
@@ -231,7 +231,7 @@ void _downgradeAssessmentSchemaToV4(Database database) {
   database.execute('DROP TABLE assessment_attempt_options_v5');
   database.execute('DROP TABLE assessment_attempt_questions_v5');
   database.execute('DROP TABLE assessment_attempts_v5');
-  database.execute('DELETE FROM schema_migrations WHERE version = 5');
+  database.execute('DELETE FROM schema_migrations WHERE version IN (5, 6)');
 }
 
 int _count(CatalogDatabase catalog, String table) {
@@ -246,6 +246,7 @@ int _count(CatalogDatabase catalog, String table) {
     'users',
     'sessions',
     'training_attempts',
+    'training_attempt_options',
     'mission_progress',
     'questions',
     'question_options',

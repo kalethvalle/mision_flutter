@@ -5,6 +5,7 @@ import 'package:mision_flutter/application/authoring/authoring_service.dart';
 import 'package:mision_flutter/application/identity/identity_service.dart';
 import 'package:mision_flutter/application/progress/progress_service.dart';
 import 'package:mision_flutter/core/models/authoring_model.dart';
+import 'package:mision_flutter/core/models/mission_model.dart';
 import 'package:mision_flutter/core/models/user_model.dart';
 import 'package:mision_flutter/core/repositories/catalog_repository.dart';
 import 'package:mision_flutter/server/database/catalog_database.dart';
@@ -152,6 +153,7 @@ void main() {
           category: base.category,
           codeTemplate: const [],
           targetPlaceholder: '',
+          selectionType: MissionSelectionType.single,
           previewType: '',
           sortOrder: 6,
           status: ContentStatus.published,
@@ -187,6 +189,7 @@ void main() {
         category: base.category,
         codeTemplate: const [],
         targetPlaceholder: '',
+        selectionType: MissionSelectionType.single,
         previewType: '',
         sortOrder: 6,
         status: ContentStatus.draft,
@@ -211,6 +214,7 @@ void main() {
         category: base.category,
         codeTemplate: base.codeTemplate,
         targetPlaceholder: base.targetPlaceholder,
+        selectionType: base.selectionType,
         previewType: base.previewType,
         sortOrder: 6,
         status: ContentStatus.published,
@@ -245,7 +249,7 @@ void main() {
     await progress.checkAnswer(
       user: account,
       missionId: 'w1_m1',
-      optionId: 'int',
+      optionIds: const ['int'],
       hintUsed: false,
     );
 
@@ -265,6 +269,7 @@ void main() {
         category: original.category,
         codeTemplate: original.codeTemplate,
         targetPlaceholder: original.targetPlaceholder,
+        selectionType: original.selectionType,
         previewType: original.previewType,
         sortOrder: original.sortOrder,
         status: original.status,

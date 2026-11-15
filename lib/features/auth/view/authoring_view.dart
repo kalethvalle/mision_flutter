@@ -82,7 +82,7 @@ class ContentAuthoringView extends StatelessWidget {
                       ? 'Misión sin título'
                       : mission.title,
                   subtitle:
-                      '${_worldName(store, mission.worldId)} • v${mission.contentVersion} • ${mission.previewType}',
+                      '${_worldName(store, mission.worldId)} • ${mission.selectionType.wireName} • v${mission.contentVersion} • ${mission.previewType}',
                   status: mission.status,
                   onEdit: () => _showMission(context, store, mission),
                 ),
@@ -357,6 +357,7 @@ class _MissionDialogState extends State<_MissionDialog> {
   late String _worldId;
   late String _topicId;
   late MissionCategory _category;
+  late MissionSelectionType _selectionType;
   late String _previewType;
   late ContentStatus _status;
 
@@ -368,6 +369,7 @@ class _MissionDialogState extends State<_MissionDialog> {
     _worldId = value?.worldId ?? firstTopic.worldId;
     _topicId = value?.topicId ?? firstTopic.id!;
     _category = value?.category ?? MissionCategory.dartBasics;
+    _selectionType = value?.selectionType ?? MissionSelectionType.single;
     _previewType = value?.previewType ?? widget.store.previewTypes.first;
     _status = value?.status ?? ContentStatus.draft;
     _text = [
@@ -389,7 +391,7 @@ class _MissionDialogState extends State<_MissionDialog> {
       value?.options
               .where((item) => item.isCorrect)
               .map((item) => item.id)
-              .firstOrNull ??
+              .join(',') ??
           '',
     ].map((value) => TextEditingController(text: value)).toList();
   }
@@ -467,6 +469,21 @@ class _MissionDialogState extends State<_MissionDialog> {
               .toList(),
           onChanged: (value) => setState(() => _previewType = value!),
         ),
+        DropdownButtonFormField<MissionSelectionType>(
+          initialValue: _selectionType,
+          decoration: const InputDecoration(labelText: 'Tipo de selección'),
+          items: MissionSelectionType.values
+              .map(
+                (value) => DropdownMenuItem(
+                  value: value,
+                  child: Text(
+                    value == MissionSelectionType.single ? 'Única' : 'Múltiple',
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (value) => setState(() => _selectionType = value!),
+        ),
         _field(_text[8], 'Plantilla de código', lines: 5),
         _field(_text[9], 'Marcador de respuesta'),
         _field(_text[10], 'Orden', number: true),
@@ -475,7 +492,7 @@ class _MissionDialogState extends State<_MissionDialog> {
           'Opciones: id|etiqueta|código (una por línea)',
           lines: 5,
         ),
-        _field(_text[12], 'ID de la opción correcta'),
+        _field(_text[12], 'IDs correctos separados por coma'),
         _statusField(_status, (value) => setState(() => _status = value)),
       ],
     );
@@ -496,6 +513,7 @@ class _MissionDialogState extends State<_MissionDialog> {
         category: _category,
         codeTemplate: _nonEmptyLines(_text[8].text),
         targetPlaceholder: _text[9].text,
+        selectionType: _selectionType,
         previewType: _previewType,
         sortOrder: int.tryParse(_text[10].text) ?? 0,
         status: _status,
@@ -874,8 +892,13 @@ List<String> _nonEmptyLines(String value) => value
 
 List<AuthoringMissionOption> _parseMissionOptions(
   String value,
-  String correctId,
+  String correctIds,
 ) {
+  final correct = correctIds
+      .split(',')
+      .map((id) => id.trim())
+      .where((id) => id.isNotEmpty)
+      .toSet();
   return _nonEmptyLines(value).map((line) {
     final first = line.indexOf('|');
     final second = first < 0 ? -1 : line.indexOf('|', first + 1);
@@ -886,7 +909,7 @@ List<AuthoringMissionOption> _parseMissionOptions(
       id: id,
       label: label,
       codeSnippet: code,
-      isCorrect: id == correctId.trim(),
+      isCorrect: correct.contains(id),
     );
   }).toList();
 }

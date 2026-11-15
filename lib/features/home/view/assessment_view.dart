@@ -301,29 +301,65 @@ class _QuestionCard extends StatelessWidget {
             style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
-          Text(
-            question.type == QuestionType.single
-                ? 'Selecciona una opción.'
-                : 'Selecciona todas las opciones correctas.',
-            style: const TextStyle(color: QuestColors.muted),
-          ),
+          _QuestionTypeBadge(type: question.type),
           const SizedBox(height: 12),
           ...question.options.map(
             (option) => Material(
               type: MaterialType.transparency,
-              child: CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                value: selected.contains(option.id),
-                onChanged: (_) => onToggle(option.id),
-                title: Text(option.text),
-                controlAffinity: ListTileControlAffinity.leading,
-              ),
+              child: question.type == QuestionType.single
+                  ? RadioListTile<String>(
+                      contentPadding: EdgeInsets.zero,
+                      value: option.id,
+                      groupValue: selected.isEmpty ? null : selected.first,
+                      onChanged: (_) => onToggle(option.id),
+                      title: Text(option.text),
+                      activeColor: QuestColors.boss,
+                    )
+                  : CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: selected.contains(option.id),
+                      onChanged: (_) => onToggle(option.id),
+                      title: Text(option.text),
+                      activeColor: QuestColors.boss,
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
             ),
           ),
         ],
       ),
     ),
   );
+}
+
+class _QuestionTypeBadge extends StatelessWidget {
+  const _QuestionTypeBadge({required this.type});
+
+  final QuestionType type;
+
+  @override
+  Widget build(BuildContext context) {
+    final multiple = type == QuestionType.multiple;
+    return Row(
+      children: [
+        Icon(
+          multiple
+              ? Icons.check_box_outlined
+              : Icons.radio_button_checked_rounded,
+          size: 17,
+          color: QuestColors.boss,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          multiple ? 'Selección múltiple' : 'Selección única',
+          style: const TextStyle(
+            color: QuestColors.text,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _ResultBody extends StatelessWidget {
@@ -333,17 +369,40 @@ class _ResultBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = result.passed ? const Color(0xFF10B981) : Colors.orange;
+    final annulled = result.status == AssessmentAttemptStatus.annulled;
+    final color = annulled
+        ? QuestColors.danger
+        : result.passed
+        ? const Color(0xFF10B981)
+        : Colors.orange;
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
         _AssessmentHeader(
-          icon: result.passed ? Icons.emoji_events : Icons.replay,
-          title: result.passed ? 'Jefe superado' : 'Sigue entrenando',
+          icon: annulled
+              ? Icons.gpp_bad_rounded
+              : result.passed
+              ? Icons.emoji_events
+              : Icons.replay,
+          title: annulled
+              ? 'Parcial anulado'
+              : result.passed
+              ? 'Jefe superado'
+              : 'Sigue entrenando',
           message:
               '${result.score}/100 • ${result.correctAnswers}/${result.totalQuestions} respuestas correctas',
           color: color,
         ),
+        if (annulled) ...[
+          const SizedBox(height: 12),
+          QuestCard(
+            borderColor: QuestColors.danger,
+            child: Text(
+              'Nota aplicada por anulación: ${result.score}/100\nMotivo: ${result.annulledReason ?? 'Intento anulado por reglas del parcial.'}',
+              style: const TextStyle(color: QuestColors.text, height: 1.4),
+            ),
+          ),
+        ],
         const SizedBox(height: 18),
         Text(
           'Desglose por tema',

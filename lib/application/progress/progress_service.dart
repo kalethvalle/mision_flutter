@@ -11,7 +11,7 @@ abstract interface class TrainingStore {
   Future<AnswerCheckResult> checkAndRecord({
     required String userId,
     required String missionId,
-    required String optionId,
+    required List<String> optionIds,
     required bool hintUsed,
   });
 }
@@ -30,20 +30,24 @@ class ProgressService {
   Future<AnswerCheckResult> checkAnswer({
     required UserModel user,
     required String missionId,
-    required String optionId,
+    required List<String> optionIds,
     required bool hintUsed,
   }) {
     _requireStudent(user);
-    if (missionId.trim().isEmpty || optionId.trim().isEmpty) {
+    final selected = optionIds
+        .map((optionId) => optionId.trim())
+        .where((optionId) => optionId.isNotEmpty)
+        .toSet();
+    if (missionId.trim().isEmpty || selected.isEmpty) {
       throw const CatalogException(
         'invalid_option',
-        'La misión y la opción son obligatorias.',
+        'La misión y al menos una opción son obligatorias.',
       );
     }
     return _trainingStore.checkAndRecord(
       userId: user.id,
       missionId: missionId,
-      optionId: optionId,
+      optionIds: selected.toList(growable: false),
       hintUsed: hintUsed,
     );
   }

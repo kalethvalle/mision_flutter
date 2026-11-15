@@ -116,6 +116,9 @@ class SqliteCatalogRepository implements CatalogRepository {
         row['code_template']! as String,
       ) as List<Object?>).cast<String>(),
       targetPlaceholder: row['target_placeholder']! as String,
+      selectionType: MissionSelectionType.fromWireName(
+        row['selection_type']! as String,
+      ),
       options: _optionsForMission(missionId),
       previewType: row['preview_type']! as String,
     );

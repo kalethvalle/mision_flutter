@@ -137,8 +137,17 @@ class MissionView extends StatelessWidget {
     store.markHintUsed();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(mission.hint),
-        backgroundColor: QuestColors.surfaceRaised,
+        behavior: SnackBarBehavior.floating,
+        showCloseIcon: true,
+        closeIconColor: Colors.black,
+        content: Text(
+          mission.hint,
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        backgroundColor: Colors.amberAccent,
       ),
     );
   }
@@ -190,31 +199,44 @@ class _EditorPanel extends StatelessWidget {
                   style: TextStyle(color: QuestColors.muted, fontSize: 12),
                 ),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: mission.options.map((option) {
-                    final selected = store.selectedOptionId == option.id;
-                    return ChoiceChip(
-                      label: Text(
-                        option.label,
-                        style: TextStyle(
-                          color: selected ? Colors.black : Colors.white,
-                          fontWeight: selected
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
+                _SelectionTypeBadge(type: mission.selectionType),
+                const SizedBox(height: 8),
+                ...mission.options.map((option) {
+                  final selected = store.selectedOptionIds.contains(option.id);
+                  if (mission.selectionType == MissionSelectionType.single) {
+                    return Material(
+                      color: Colors.transparent,
+                      child: RadioListTile<String>(
+                        value: option.id,
+                        groupValue: store.selectedOptionId.isEmpty
+                            ? null
+                            : store.selectedOptionId,
+                        onChanged: store.isCheckingAnswer
+                            ? null
+                            : (value) => store.selectOption(mission, value!),
+                        title: Text(option.label),
+                        activeColor: QuestColors.training,
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
                       ),
-                      selected: selected,
-                      selectedColor: QuestColors.training,
-                      backgroundColor: QuestColors.border,
-                      onSelected: store.isCheckingAnswer
-                          ? null
-                          : (value) =>
-                                store.selectOption(value ? option.id : ''),
                     );
-                  }).toList(),
-                ),
+                  }
+                  return Material(
+                    color: Colors.transparent,
+                    child: CheckboxListTile(
+                      value: selected,
+                      onChanged: store.isCheckingAnswer
+                          ? null
+                          : (_) => store.selectOption(mission, option.id),
+                      title: Text(option.label),
+                      activeColor: QuestColors.training,
+                      checkColor: Colors.black,
+                      dense: true,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  );
+                }),
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
@@ -227,7 +249,8 @@ class _EditorPanel extends StatelessWidget {
                       ),
                     ),
                     onPressed:
-                        store.selectedOptionId.isEmpty || store.isCheckingAnswer
+                        store.selectedOptionIds.isEmpty ||
+                            store.isCheckingAnswer
                         ? null
                         : store.checkAnswer,
                     icon: store.isCheckingAnswer
@@ -300,6 +323,37 @@ class _EditorPanel extends StatelessWidget {
       height: 1.5,
     ),
   );
+}
+
+class _SelectionTypeBadge extends StatelessWidget {
+  const _SelectionTypeBadge({required this.type});
+
+  final MissionSelectionType type;
+
+  @override
+  Widget build(BuildContext context) {
+    final multiple = type == MissionSelectionType.multiple;
+    return Row(
+      children: [
+        Icon(
+          multiple
+              ? Icons.check_box_outlined
+              : Icons.radio_button_checked_rounded,
+          size: 18,
+          color: QuestColors.training,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          multiple ? 'Selección múltiple' : 'Selección única',
+          style: const TextStyle(
+            color: QuestColors.text,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _MissionGuidanceCard extends StatelessWidget {

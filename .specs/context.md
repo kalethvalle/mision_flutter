@@ -32,10 +32,14 @@ resultado.
   contenido, selección exacta, nota aprobatoria de 80 e intentos ilimitados.
 - Parciales controlados por sesión docente activa, temporizador sincronizado,
   pantalla completa best effort, incidentes auditables, anulación estricta,
-  reactivación docente y borradores de respuesta persistidos.
+  reactivación docente, nota configurable por anulación y borradores de
+  respuesta persistidos.
+- Arena de entrenamiento y parciales distinguen selección única/múltiple con
+  controles nativos; la Arena soporta selección múltiple persistida y
+  calificada por conjunto exacto.
 - Historial estudiantil e informes docentes filtrables que distinguen
   entrenamiento y parciales por estudiante, mundo y tema, con detalle de
-  duración, incidentes, reactivaciones y revisión por pregunta.
+  duración, incidentes estructurados, reactivaciones y revisión por pregunta.
 - Experiencia estudiantil separada en Arena de entrenamiento y Cámara del jefe
   final, con navegación clara entre práctica, parciales e historial.
 - Script demo manual para cargar preguntas publicadas de parciales en ambos
@@ -91,6 +95,7 @@ actualiza el store y `notifyListeners()` reconstruye la interfaz.
 | [`assessments-reports`](./assessments-reports/spec.md) | 2026-10-30 | Jefes finales por mundo con preguntas versionadas, calificación desde 80, revisión posterior, historial repetible e informes docentes filtrados de entrenamiento y parciales. Consulta el [plan ejecutado](./assessments-reports/plan.md). |
 | [`student-arena-boss-ui`](./student-arena-boss-ui/spec.md) | 2026-11-02 | Rediseño de la experiencia estudiantil en Arena de entrenamiento y Cámara del jefe final, mejora visual de misiones y parciales, y script demo idempotente de preguntas publicadas. Consulta el [plan ejecutado](./student-arena-boss-ui/plan.md). |
 | [`secure-assessment-sessions`](./secure-assessment-sessions/spec.md) | 2026-11-11 | Parciales activados por docente con configuración por mundo, deadline sincronizado, pantalla completa best effort, registro de incidentes, anulación y reactivación, monitoreo docente y reportes detallados por pregunta. Consulta el [plan ejecutado](./secure-assessment-sessions/plan.md). |
+| [`assessment-session-refinements`](./assessment-session-refinements/spec.md) | 2026-11-11 | Ajustes de Arena y parciales: pista contrastada, selección única/múltiple con radio/checkbox, selección múltiple en entrenamiento, nota por anulación y listas estructuradas de incidentes para docente. Consulta el [plan ejecutado](./assessment-session-refinements/plan.md). |
 
 ## Deuda técnica conocida
 

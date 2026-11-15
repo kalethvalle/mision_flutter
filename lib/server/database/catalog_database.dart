@@ -41,6 +41,7 @@ class CatalogDatabase {
     if (!_migrationApplied(3)) _applyMigrationThree();
     if (!_migrationApplied(4)) _applyMigrationFour();
     if (!_migrationApplied(5)) _applyMigrationFive();
+    if (!_migrationApplied(6)) _applyMigrationSix();
     _seedCatalog();
   }
 
@@ -438,6 +439,61 @@ class CatalogDatabase {
     database.execute('PRAGMA foreign_keys = ON');
   }
 
+  void _applyMigrationSix() {
+    _transaction(() {
+      final now = DateTime.now().toUtc().toIso8601String();
+      if (!_columnExists('missions', 'selection_type')) {
+        database.execute('''
+          ALTER TABLE missions
+          ADD COLUMN selection_type TEXT NOT NULL DEFAULT 'single'
+            CHECK (selection_type IN ('single', 'multiple'))
+        ''');
+      }
+      if (!_columnExists('assessment_world_settings', 'annulled_score')) {
+        database.execute('''
+          ALTER TABLE assessment_world_settings
+          ADD COLUMN annulled_score INTEGER NOT NULL DEFAULT 0
+            CHECK (annulled_score BETWEEN 0 AND 100)
+        ''');
+      }
+      if (!_columnExists('assessment_sessions', 'annulled_score')) {
+        database.execute('''
+          ALTER TABLE assessment_sessions
+          ADD COLUMN annulled_score INTEGER NOT NULL DEFAULT 0
+        ''');
+      }
+      database.execute('''
+        CREATE TABLE IF NOT EXISTS training_attempt_options (
+          attempt_id TEXT NOT NULL
+            REFERENCES training_attempts(id) ON DELETE CASCADE,
+          mission_id TEXT NOT NULL,
+          option_id TEXT NOT NULL,
+          PRIMARY KEY(attempt_id, option_id),
+          FOREIGN KEY(mission_id, option_id)
+            REFERENCES mission_options(mission_id, id) ON DELETE RESTRICT
+        )
+      ''');
+      database.execute('''
+        INSERT OR IGNORE INTO training_attempt_options(
+          attempt_id, mission_id, option_id
+        )
+        SELECT id, mission_id, selected_option_id
+        FROM training_attempts
+      ''');
+      database.execute('''
+        CREATE INDEX IF NOT EXISTS idx_training_attempt_options_attempt
+        ON training_attempt_options(attempt_id)
+      ''');
+      database.execute(
+        '''
+        INSERT INTO schema_migrations(version, applied_at)
+        VALUES (?, ?)
+      ''',
+        [6, now],
+      );
+    });
+  }
+
   bool _columnExists(String table, String column) {
     return database
         .select('PRAGMA table_info($table)')
@@ -579,16 +635,29 @@ class CatalogDatabase {
       }
       if (_migrationApplied(5)) {
         final now = DateTime.now().toUtc().toIso8601String();
-        database.execute(
-          '''
-          INSERT OR IGNORE INTO assessment_world_settings(
-            world_id, duration_minutes, fullscreen_required, max_incidents,
-            return_grace_seconds, strict_mode, updated_at
-          )
-          SELECT id, 20, 1, 2, 10, 1, ? FROM worlds
-        ''',
-          [now],
-        );
+        if (_columnExists('assessment_world_settings', 'annulled_score')) {
+          database.execute(
+            '''
+            INSERT OR IGNORE INTO assessment_world_settings(
+              world_id, duration_minutes, fullscreen_required, max_incidents,
+              return_grace_seconds, strict_mode, annulled_score, updated_at
+            )
+            SELECT id, 20, 1, 2, 10, 1, 0, ? FROM worlds
+          ''',
+            [now],
+          );
+        } else {
+          database.execute(
+            '''
+            INSERT OR IGNORE INTO assessment_world_settings(
+              world_id, duration_minutes, fullscreen_required, max_incidents,
+              return_grace_seconds, strict_mode, updated_at
+            )
+            SELECT id, 20, 1, 2, 10, 1, ? FROM worlds
+          ''',
+            [now],
+          );
+        }
       }
       for (final topic in seedTopics) {
         database.execute(

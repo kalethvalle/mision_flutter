@@ -1,4 +1,5 @@
 import '../../core/models/authoring_model.dart';
+import '../../core/models/mission_model.dart';
 import '../../core/models/user_model.dart';
 import '../../core/repositories/catalog_repository.dart';
 
@@ -114,8 +115,16 @@ class AuthoringService {
       )) {
         errors.add('completa el texto y código de cada opción');
       }
-      if (mission.options.where((option) => option.isCorrect).length != 1) {
-        errors.add('marca exactamente una opción correcta');
+      final correct = mission.options
+          .where((option) => option.isCorrect)
+          .length;
+      if (mission.selectionType == MissionSelectionType.single &&
+          correct != 1) {
+        errors.add('selección única requiere exactamente una correcta');
+      }
+      if (mission.selectionType == MissionSelectionType.multiple &&
+          correct < 1) {
+        errors.add('selección múltiple requiere al menos una correcta');
       }
     }
     _throwValidation(errors);

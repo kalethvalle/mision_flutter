@@ -463,7 +463,7 @@ class SqliteAssessmentStore implements AssessmentStore {
         answeredQuestions: _answeredDraftCount(attemptId),
         totalQuestions: attempt['total_questions']! as int,
       );
-      final settings = _settingsFor(attempt['world_id']! as String);
+      final settings = _settingsForSession(sessionId);
       final incidents = _incidentCount(attemptId);
       if (settings.strictMode && incidents >= settings.maxIncidents) {
         _annulAttempt(
@@ -517,14 +517,15 @@ class SqliteAssessmentStore implements AssessmentStore {
       '''
       INSERT INTO assessment_world_settings(
         world_id, duration_minutes, fullscreen_required, max_incidents,
-        return_grace_seconds, strict_mode, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        return_grace_seconds, strict_mode, annulled_score, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(world_id) DO UPDATE SET
         duration_minutes = excluded.duration_minutes,
         fullscreen_required = excluded.fullscreen_required,
         max_incidents = excluded.max_incidents,
         return_grace_seconds = excluded.return_grace_seconds,
         strict_mode = excluded.strict_mode,
+        annulled_score = excluded.annulled_score,
         updated_at = excluded.updated_at
     ''',
       [
@@ -534,6 +535,7 @@ class SqliteAssessmentStore implements AssessmentStore {
         settings.maxIncidents,
         settings.returnGraceSeconds,
         settings.strictMode ? 1 : 0,
+        settings.annulledScore,
         _now(),
       ],
     );
@@ -573,8 +575,8 @@ class SqliteAssessmentStore implements AssessmentStore {
           INSERT INTO assessment_sessions(
             id, world_id, opened_by, status, opened_at, closes_at,
             duration_minutes, fullscreen_required, max_incidents,
-            return_grace_seconds, strict_mode
-          ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?)
+            return_grace_seconds, strict_mode, annulled_score
+          ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?)
         ''',
           [
             sessionId,
@@ -587,6 +589,7 @@ class SqliteAssessmentStore implements AssessmentStore {
             settings.maxIncidents,
             settings.returnGraceSeconds,
             settings.strictMode ? 1 : 0,
+            settings.annulledScore,
           ],
         );
         _recordEvent(
@@ -657,7 +660,8 @@ class SqliteAssessmentStore implements AssessmentStore {
         '''
         UPDATE assessment_attempts
         SET status = 'open', annulled_at = NULL, annulled_reason = NULL,
-          reactivation_count = reactivation_count + 1
+          reactivation_count = reactivation_count + 1,
+          score = NULL, passed = NULL, correct_answers = NULL
         WHERE id = ?
       ''',
         [attemptId],
@@ -867,7 +871,9 @@ class SqliteAssessmentStore implements AssessmentStore {
       worldTitle: row['world_title']! as String,
       startedAt: DateTime.parse(row['started_at']! as String),
       deadlineAt: DateTime.parse(deadline ?? row['started_at']! as String),
-      settings: _settingsFor(row['world_id']! as String),
+      settings: row['session_id'] == null
+          ? _settingsFor(row['world_id']! as String)
+          : _settingsForSession(row['session_id']! as String),
       draftAnswers: _draftAnswers(attemptId),
       questions: _database
           .select(
@@ -920,7 +926,7 @@ class SqliteAssessmentStore implements AssessmentStore {
     );
     if (rows.isEmpty) throw _attemptNotFound;
     final attempt = rows.single;
-    if (attempt['status'] != 'submitted') {
+    if (attempt['status'] != 'submitted' && attempt['status'] != 'annulled') {
       throw const CatalogException(
         'attempt_open',
         'Entrega el intento antes de consultar su resultado.',
@@ -971,13 +977,22 @@ class SqliteAssessmentStore implements AssessmentStore {
       attemptId: attemptId,
       worldId: attempt['world_id']! as String,
       worldTitle: attempt['world_title']! as String,
-      score: attempt['score']! as int,
+      score: (attempt['score'] as int?) ?? 0,
       passed: attempt['passed'] == 1,
-      correctAnswers: attempt['correct_answers']! as int,
+      correctAnswers: (attempt['correct_answers'] as int?) ?? 0,
       totalQuestions: attempt['total_questions']! as int,
-      submittedAt: DateTime.parse(attempt['submitted_at']! as String),
+      submittedAt: DateTime.parse(
+        (attempt['submitted_at'] ??
+                attempt['annulled_at'] ??
+                attempt['started_at'])!
+            as String,
+      ),
       topics: _topicScores(attemptId),
       reviews: reviews,
+      status: AssessmentAttemptStatus.fromWireName(
+        attempt['status']! as String,
+      ),
+      annulledReason: attempt['annulled_reason'] as String?,
     );
   }
 
@@ -1113,6 +1128,25 @@ class SqliteAssessmentStore implements AssessmentStore {
       maxIncidents: row['max_incidents']! as int,
       returnGraceSeconds: row['return_grace_seconds']! as int,
       strictMode: row['strict_mode'] == 1,
+      annulledScore: row['annulled_score']! as int,
+    );
+  }
+
+  AssessmentWorldSettings _settingsForSession(String sessionId) {
+    final rows = _database.select(
+      'SELECT * FROM assessment_sessions WHERE id = ?',
+      [sessionId],
+    );
+    if (rows.isEmpty) throw _attemptNotFound;
+    final row = rows.single;
+    return AssessmentWorldSettings(
+      worldId: row['world_id']! as String,
+      durationMinutes: row['duration_minutes']! as int,
+      fullscreenRequired: row['fullscreen_required'] == 1,
+      maxIncidents: row['max_incidents']! as int,
+      returnGraceSeconds: row['return_grace_seconds']! as int,
+      strictMode: row['strict_mode'] == 1,
+      annulledScore: row['annulled_score']! as int,
     );
   }
 
@@ -1144,6 +1178,7 @@ class SqliteAssessmentStore implements AssessmentStore {
       maxIncidents: row['max_incidents']! as int,
       returnGraceSeconds: row['return_grace_seconds']! as int,
       strictMode: row['strict_mode'] == 1,
+      annulledScore: row['annulled_score']! as int,
     );
     return AssessmentSession(
       id: row['id']! as String,
@@ -1191,6 +1226,7 @@ class SqliteAssessmentStore implements AssessmentStore {
             totalQuestions: row['total_questions']! as int,
             incidents: _incidentCount(row['id']! as String),
             reactivationCount: row['reactivation_count']! as int,
+            events: _eventsForAttempt(row['id']! as String),
             annulledReason: row['annulled_reason'] as String?,
           ),
         )
@@ -1251,15 +1287,19 @@ class SqliteAssessmentStore implements AssessmentStore {
       [attemptId],
     );
     if (rows.isEmpty) return;
+    final sessionId = rows.single['session_id'] as String?;
+    final score = sessionId == null
+        ? 0
+        : _settingsForSession(sessionId).annulledScore;
     _database.execute(
       '''
       UPDATE assessment_attempts
-      SET status = 'annulled', annulled_at = ?, annulled_reason = ?
+      SET status = 'annulled', annulled_at = ?, annulled_reason = ?,
+        score = ?, passed = 0, correct_answers = 0
       WHERE id = ? AND status = 'open'
     ''',
-      [_now(), reason, attemptId],
+      [_now(), reason, score, attemptId],
     );
-    final sessionId = rows.single['session_id'] as String?;
     if (sessionId != null) {
       _recordEvent(
         sessionId,
@@ -1267,6 +1307,7 @@ class SqliteAssessmentStore implements AssessmentStore {
         userId: rows.single['user_id'] as String?,
         type: type,
         message: reason,
+        score: score,
       );
     }
   }

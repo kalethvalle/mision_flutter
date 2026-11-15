@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/models/assessment_model.dart';
 import '../../../core/models/user_model.dart';
 import '../../../core/store/assessment_store.dart';
 import '../../../core/store/authoring_store.dart';
@@ -226,9 +227,14 @@ class _ReportViewState extends State<ReportView> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Nota ${detail.attempt.score}/100 • ${detail.attempt.incidents} incidentes • ${detail.attempt.durationSeconds ~/ 60} min',
+                  'Nota ${detail.attempt.score}/100 • ${detail.attempt.status.wireName.toUpperCase()} • ${detail.attempt.incidents} incidentes • ${detail.attempt.durationSeconds ~/ 60} min',
                 ),
                 const SizedBox(height: 12),
+                Text(
+                  'Preguntas',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
                 ...detail.questions.map(
                   (question) => ListTile(
                     leading: Icon(
@@ -244,11 +250,18 @@ class _ReportViewState extends State<ReportView> {
                   ),
                 ),
                 const Divider(),
-                ...detail.events.map(
-                  (event) => Text(
-                    '${event.occurredAt.toLocal()} • ${event.type}: ${event.message}',
-                  ),
+                Text(
+                  'Incidentes',
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
+                const SizedBox(height: 8),
+                if (detail.events.isEmpty)
+                  const Text(
+                    'Sin eventos registrados.',
+                    style: TextStyle(color: Color(0xFF94A3B8)),
+                  )
+                else
+                  ...detail.events.map((event) => _EventTile(event: event)),
               ],
             ),
           ),
@@ -263,6 +276,51 @@ class _ReportViewState extends State<ReportView> {
     );
   }
 }
+
+class _EventTile extends StatelessWidget {
+  const _EventTile({required this.event});
+
+  final AssessmentAttemptEvent event;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    dense: true,
+    contentPadding: EdgeInsets.zero,
+    leading: Icon(_eventIcon(event.type), size: 20),
+    title: Text(_eventLabel(event.type)),
+    subtitle: Text(
+      '${event.occurredAt.toLocal()} • ${event.message}${event.answeredQuestions == null ? '' : ' • ${event.answeredQuestions}/${event.totalQuestions} respondidas'}${event.score == null ? '' : ' • nota ${event.score}'}',
+    ),
+  );
+}
+
+IconData _eventIcon(String type) => switch (type) {
+  'fullscreen_exit' ||
+  'focus_lost' ||
+  'visibility_hidden' ||
+  'blocked_key' ||
+  'pagehide' => Icons.warning_amber_rounded,
+  'annulled' || 'expired' => Icons.gpp_bad_rounded,
+  'reactivated' => Icons.restart_alt_rounded,
+  'submitted' => Icons.flag_rounded,
+  'progress' => Icons.edit_note_rounded,
+  _ => Icons.info_outline,
+};
+
+String _eventLabel(String type) => switch (type) {
+  'fullscreen_exit' => 'Salida de pantalla completa',
+  'focus_lost' => 'Pérdida de foco',
+  'visibility_hidden' => 'Cambio de pestaña',
+  'blocked_key' => 'Tecla bloqueada',
+  'pagehide' => 'Salida o recarga',
+  'annulled' => 'Anulación',
+  'expired' => 'Tiempo agotado',
+  'reactivated' => 'Reactivación',
+  'submitted' => 'Entrega',
+  'progress' => 'Progreso',
+  'started' => 'Inicio',
+  _ => type,
+};
 
 class _ReportSection extends StatelessWidget {
   const _ReportSection({

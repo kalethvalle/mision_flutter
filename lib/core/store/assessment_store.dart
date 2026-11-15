@@ -109,6 +109,18 @@ class AssessmentStore extends ChangeNotifier {
         message: message,
       );
     } on Object catch (error) {
+      if (error is CatalogException && error.code == 'attempt_annulled') {
+        try {
+          _result = await _repository.getAssessmentResult(current.id);
+          _attempt = null;
+          _answers.clear();
+          _overview = await _repository.getAssessmentOverview();
+        } on Object {
+          _error = error.message;
+        }
+        notifyListeners();
+        return;
+      }
       _error = _messageFor(error);
     }
     notifyListeners();
@@ -117,14 +129,37 @@ class AssessmentStore extends ChangeNotifier {
   Future<bool> submit() async {
     final current = _attempt;
     if (current == null) return false;
-    return _run(() async {
+    if (_isBusy) return false;
+    _isBusy = true;
+    _error = null;
+    notifyListeners();
+    try {
       _result = await _repository.submitAssessment(current.id, {
         for (final entry in _answers.entries) entry.key: entry.value.toList(),
       });
       _attempt = null;
       _answers.clear();
       _overview = await _repository.getAssessmentOverview();
-    });
+      return true;
+    } on Object catch (error) {
+      if (error is CatalogException && error.code == 'attempt_annulled') {
+        try {
+          _result = await _repository.getAssessmentResult(current.id);
+          _attempt = null;
+          _answers.clear();
+          _overview = await _repository.getAssessmentOverview();
+          return false;
+        } on Object {
+          _error = error.message;
+          return false;
+        }
+      }
+      _error = _messageFor(error);
+      return false;
+    } finally {
+      _isBusy = false;
+      notifyListeners();
+    }
   }
 
   void clearActive() {

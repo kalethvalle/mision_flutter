@@ -17,7 +17,7 @@ abstract interface class CatalogRepository {
 abstract interface class MissionAnswerRepository {
   Future<AnswerCheckResult> checkMissionAnswer(
     String missionId,
-    String optionId, {
+    List<String> optionIds, {
     required bool hintUsed,
   });
 }
