@@ -104,6 +104,7 @@ actualiza el store y `notifyListeners()` reconstruye la interfaz.
 | [`assessment-session-refinements`](./assessment-session-refinements/spec.md) | 2026-11-11 | Ajustes de Arena y parciales: pista contrastada, selección única/múltiple con radio/checkbox, selección múltiple en entrenamiento, nota por anulación y listas estructuradas de incidentes para docente. Consulta el [plan ejecutado](./assessment-session-refinements/plan.md). |
 | [`learning-analytics-dashboard`](./learning-analytics-dashboard/spec.md) | 2026-11-15 | Data warehouse estrella derivado, refresh docente, auditoría analítica y pestaña `MÉTRICAS` para evolución estudiantil, rendimiento académico, temas críticos e integridad. Consulta el [plan ejecutado](./learning-analytics-dashboard/plan.md). |
 | [`teacher-ux-guidance`](./teacher-ux-guidance/spec.md) | 2026-11-15 | Mejora UX incremental del panel docente con cabeceras orientadas a flujo, métricas compactas, pasos recomendados para contenido/parciales e instructivo operativo en `docs/`. Consulta el [plan ejecutado](./teacher-ux-guidance/plan.md). |
+| [`mongodb-teacher-metrics-warehouse`](./mongodb-teacher-metrics-warehouse/spec.md) | 2026-11-15 | Fase documental para entregar un escenario de data warehouse MongoDB orientado a métricas docentes, manteniendo SQLite/API como fuente de verdad y sin tocar runtime Flutter. Incluye contrato de colecciones, scripts `mongosh`, CRUD demo e instructivo en `docs/mongodb-teacher-metrics/`. Consulta el [plan ejecutado](./mongodb-teacher-metrics-warehouse/plan.md). |
 
 ## Deuda técnica conocida
 
@@ -115,4 +116,7 @@ actualiza el store y `notifyListeners()` reconstruye la interfaz.
 - Materias, jornadas e inscripción de estudiantes quedan como épica futura
   para atribuir intentos a una materia-jornada sin romper el historial actual.
 - Android aún no tiene adaptador SQLite nativo ni validación en esta fase.
+- El escenario MongoDB de métricas docentes es un entregable documental:
+  requiere ETL real desde SQLite/export/API antes de usarse como servicio
+  operativo.
 
