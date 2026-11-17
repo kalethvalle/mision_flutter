@@ -34,8 +34,25 @@ reemplaza SQLite por una base multiusuario externa.
 El repositorio incluye `Dockerfile` en la raíz del proyecto:
 
 ```dockerfile
-ARG FLUTTER_IMAGE=ghcr.io/cirruslabs/flutter:beta
-FROM ${FLUTTER_IMAGE} AS build
+FROM debian:bookworm-slim AS build
+
+ARG FLUTTER_VERSION=3.47.9
+ENV PATH="/opt/flutter/bin:/opt/flutter/bin/cache/dart-sdk/bin:${PATH}"
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+        unzip \
+        xz-utils \
+        zip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth 1 --branch ${FLUTTER_VERSION} https://github.com/flutter/flutter.git /opt/flutter \
+    && flutter --version \
+    && dart --version \
+    && flutter config --enable-web
 
 WORKDIR /app
 
@@ -89,7 +106,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        FLUTTER_IMAGE: ${FLUTTER_IMAGE:-ghcr.io/cirruslabs/flutter:beta}
+        FLUTTER_VERSION: ${FLUTTER_VERSION:-3.47.9}
     container_name: flutter-quest
     restart: unless-stopped
     ports:
@@ -117,20 +134,20 @@ docker compose -f compose.prod.yaml logs -f flutter-quest
 Si tu Ubuntu usa Compose legacy, reemplaza `docker compose` por
 `docker-compose`.
 
-El proyecto exige Dart `^3.13.0`. Si el build falla en `flutter pub get` con
-`The current Dart SDK version is 3.12.0`, la imagen Flutter usada es vieja.
-Usa una imagen con Dart 3.13 o superior:
+El proyecto exige Dart `^3.13.0`. El Dockerfile instala Flutter `3.47.9`, que
+usa Dart `3.13.7`, para evitar imágenes Docker de Flutter desactualizadas. Si
+necesitas fijar otra versión compatible:
 
 ```sh
-FLUTTER_IMAGE=ghcr.io/cirruslabs/flutter:beta docker compose -f compose.prod.yaml build --no-cache
-FLUTTER_IMAGE=ghcr.io/cirruslabs/flutter:beta docker compose -f compose.prod.yaml up -d
+FLUTTER_VERSION=3.47.9 docker compose -f compose.prod.yaml build --no-cache
+FLUTTER_VERSION=3.47.9 docker compose -f compose.prod.yaml up -d
 ```
 
 Con Compose legacy:
 
 ```sh
-FLUTTER_IMAGE=ghcr.io/cirruslabs/flutter:beta docker-compose -f compose.prod.yaml build --no-cache
-FLUTTER_IMAGE=ghcr.io/cirruslabs/flutter:beta docker-compose -f compose.prod.yaml up -d
+FLUTTER_VERSION=3.47.9 docker-compose -f compose.prod.yaml build --no-cache
+FLUTTER_VERSION=3.47.9 docker-compose -f compose.prod.yaml up -d
 ```
 
 Valida en el servidor:

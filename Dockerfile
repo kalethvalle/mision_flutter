@@ -1,5 +1,22 @@
-ARG FLUTTER_IMAGE=ghcr.io/cirruslabs/flutter:beta
-FROM ${FLUTTER_IMAGE} AS build
+FROM debian:bookworm-slim AS build
+
+ARG FLUTTER_VERSION=3.47.9
+ENV PATH="/opt/flutter/bin:/opt/flutter/bin/cache/dart-sdk/bin:${PATH}"
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+        unzip \
+        xz-utils \
+        zip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth 1 --branch ${FLUTTER_VERSION} https://github.com/flutter/flutter.git /opt/flutter \
+    && flutter --version \
+    && dart --version \
+    && flutter config --enable-web
 
 WORKDIR /app
 
