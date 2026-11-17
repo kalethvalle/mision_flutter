@@ -1,4 +1,5 @@
-FROM ghcr.io/cirruslabs/flutter:stable AS build
+ARG FLUTTER_IMAGE=ghcr.io/cirruslabs/flutter:beta
+FROM ${FLUTTER_IMAGE} AS build
 
 WORKDIR /app
 

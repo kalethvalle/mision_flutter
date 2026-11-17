@@ -34,7 +34,8 @@ reemplaza SQLite por una base multiusuario externa.
 El repositorio incluye `Dockerfile` en la raíz del proyecto:
 
 ```dockerfile
-FROM ghcr.io/cirruslabs/flutter:stable AS build
+ARG FLUTTER_IMAGE=ghcr.io/cirruslabs/flutter:beta
+FROM ${FLUTTER_IMAGE} AS build
 
 WORKDIR /app
 
@@ -87,6 +88,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        FLUTTER_IMAGE: ${FLUTTER_IMAGE:-ghcr.io/cirruslabs/flutter:beta}
     container_name: flutter-quest
     restart: unless-stopped
     ports:
@@ -113,6 +116,22 @@ docker compose -f compose.prod.yaml logs -f flutter-quest
 
 Si tu Ubuntu usa Compose legacy, reemplaza `docker compose` por
 `docker-compose`.
+
+El proyecto exige Dart `^3.13.0`. Si el build falla en `flutter pub get` con
+`The current Dart SDK version is 3.12.0`, la imagen Flutter usada es vieja.
+Usa una imagen con Dart 3.13 o superior:
+
+```sh
+FLUTTER_IMAGE=ghcr.io/cirruslabs/flutter:beta docker compose -f compose.prod.yaml build --no-cache
+FLUTTER_IMAGE=ghcr.io/cirruslabs/flutter:beta docker compose -f compose.prod.yaml up -d
+```
+
+Con Compose legacy:
+
+```sh
+FLUTTER_IMAGE=ghcr.io/cirruslabs/flutter:beta docker-compose -f compose.prod.yaml build --no-cache
+FLUTTER_IMAGE=ghcr.io/cirruslabs/flutter:beta docker-compose -f compose.prod.yaml up -d
+```
 
 Valida en el servidor:
 
