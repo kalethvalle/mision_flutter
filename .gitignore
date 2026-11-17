@@ -50,3 +50,6 @@ app.*.map.json
 
 # FVM Version Cache
 .fvm/
+
+# module execute mongo teacher metrics
+docs/mongodb-teacher-metrics/node_modules

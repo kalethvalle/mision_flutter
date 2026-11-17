@@ -1,0 +1,15 @@
+{
+  "name": "mongodb-teacher-metrics",
+  "version": "1.0.0",
+  "description": "Este paquete plantea MongoDB como data warehouse documental para las metricas que revisa el docente en `mision_flutter`. No reemplaza SQLite/API: MongoDB queda como capa derivada para analitica, respaldo y sustentacion.",
+  "main": "consultas.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "mongodb": "^7.9.0"
+  }
+}

@@ -12,6 +12,12 @@ La [planificación SDD de las 12 historias de usuario](docs/stories-users.md)
 describe la evolución del producto. Las features verificadas se registran en
 [`.specs/context.md`](.specs/context.md).
 
+El entregable academico de data warehouse MongoDB para metricas docentes esta
+documentado en
+[`docs/mongodb-teacher-metrics/README.md`](docs/mongodb-teacher-metrics/README.md).
+Ese escenario es analitico y derivado; SQLite/API sigue siendo la fuente de
+verdad de la aplicacion.
+
 ## Ejecutar la versión web local
 
 Requiere Flutter y Dart 3.13 o posteriores. Desde la raíz del proyecto:
