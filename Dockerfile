@@ -25,7 +25,7 @@ RUN flutter pub get
 
 COPY . .
 RUN flutter build web --release
-RUN dart compile exe bin/server.dart -o /tmp/flutter_quest_server
+RUN dart build cli --target bin/server.dart -o /tmp/flutter_quest_server
 
 FROM debian:bookworm-slim
 
@@ -35,11 +35,11 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY --from=build /tmp/flutter_quest_server /app/flutter_quest_server
+COPY --from=build /tmp/flutter_quest_server/bundle /app/server_bundle
 COPY --from=build /app/build/web /app/build/web
 
 RUN mkdir -p /app/data
 
 EXPOSE 8080
 
-CMD ["/app/flutter_quest_server", "--host", "0.0.0.0", "--port", "8080", "--database", "/app/data/flutter_quest.sqlite3", "--web-root", "/app/build/web"]
+CMD ["/app/server_bundle/bin/server", "--host", "0.0.0.0", "--port", "8080", "--database", "/app/data/flutter_quest.sqlite3", "--web-root", "/app/build/web"]
