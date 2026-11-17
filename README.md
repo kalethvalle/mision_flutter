@@ -18,6 +18,9 @@ documentado en
 Ese escenario es analitico y derivado; SQLite/API sigue siendo la fuente de
 verdad de la aplicacion.
 
+La guía de despliegue en Ubuntu con Docker y Cloudflare Tunnel está en
+[`docs/despliegue-docker-cloudflare.md`](docs/despliegue-docker-cloudflare.md).
+
 ## Ejecutar la versión web local
 
 Requiere Flutter y Dart 3.13 o posteriores. Desde la raíz del proyecto:

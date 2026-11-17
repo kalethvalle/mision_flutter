@@ -50,6 +50,9 @@ resultado.
   mundos sin crear usuarios ni progreso automáticamente.
 - Instructivo docente en `docs/instructivo-docente.md` para crear mundos,
   temas, misiones, preguntas, parciales y revisar resultados/métricas.
+- Guía operativa en `docs/despliegue-docker-cloudflare.md` para publicar la
+  versión web/API en Ubuntu con Docker, SQLite persistente y Cloudflare Tunnel
+  apuntando al localhost del servidor.
 
 ## Arquitectura y flujo de datos
 
