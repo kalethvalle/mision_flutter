@@ -30,7 +30,7 @@ RUN dart build cli --target bin/server.dart -o /tmp/flutter_quest_server
 FROM debian:bookworm-slim
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates libsqlite3-0 \
+    && apt-get install -y --no-install-recommends ca-certificates libsqlite3-0 libsqlite3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

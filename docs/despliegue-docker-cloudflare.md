@@ -66,7 +66,7 @@ RUN dart build cli --target bin/server.dart -o /tmp/flutter_quest_server
 FROM debian:bookworm-slim
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates libsqlite3-0 \
+    && apt-get install -y --no-install-recommends ca-certificates libsqlite3-0 libsqlite3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -152,6 +152,10 @@ FLUTTER_VERSION=3.47.9 docker-compose -f compose.prod.yaml up -d
 
 El servidor se construye con `dart build cli`, no con `dart compile exe`,
 porque la dependencia `sqlite3` usa build hooks/native assets.
+
+La imagen runtime instala `libsqlite3-dev` además de `libsqlite3-0` porque el
+binding FFI busca `libsqlite3.so`; en Debian ese enlace simbólico lo aporta el
+paquete de desarrollo.
 
 Valida en el servidor:
 
