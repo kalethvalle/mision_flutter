@@ -98,4 +98,20 @@ declara verificado en esta fase. La aplicación actual usa el adaptador HTTP
 pensado para el servidor web local; una fase posterior añadirá un adaptador
 SQLite nativo para Android reutilizando los modelos y contratos del catálogo.
 
+Para compilar el APK apuntando al servidor publicado por Cloudflare Tunnel:
+
+```sh
+flutter build apk --release \
+  --dart-define=API_BASE_URL=https://isekai-code-lerning.kvf-enginner.com/api/v1/
+```
+
+El APK generado queda en:
+
+```text
+build/app/outputs/flutter-apk/app-release.apk
+```
+
+Cada vez que cambie el dominio o ruta pública de la API, recompila el APK con
+el nuevo `API_BASE_URL`.
+
 Consulta la [documentación oficial de compilación Android](https://docs.flutter.dev/deployment/android).
