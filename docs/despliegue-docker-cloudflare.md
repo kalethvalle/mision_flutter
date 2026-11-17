@@ -31,7 +31,7 @@ reemplaza SQLite por una base multiusuario externa.
 
 ## Dockerfile
 
-Crea `Dockerfile` en la raíz del proyecto:
+El repositorio incluye `Dockerfile` en la raíz del proyecto:
 
 ```dockerfile
 FROM ghcr.io/cirruslabs/flutter:stable AS build
@@ -63,8 +63,8 @@ EXPOSE 8080
 CMD ["/app/flutter_quest_server", "--host", "0.0.0.0", "--port", "8080", "--database", "/app/data/flutter_quest.sqlite3", "--web-root", "/app/build/web"]
 ```
 
-También crea `.dockerignore` para evitar subir artefactos locales al contexto
-de build:
+El repositorio también incluye `.dockerignore` para evitar subir artefactos
+locales al contexto de build:
 
 ```dockerignore
 .dart_tool/
@@ -79,7 +79,7 @@ docs/mongodb-teacher-metrics/node_modules/
 
 ## Compose de la aplicación
 
-Crea `compose.prod.yaml` en la raíz del proyecto:
+El repositorio incluye `compose.prod.yaml` en la raíz del proyecto:
 
 ```yaml
 services:

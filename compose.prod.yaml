@@ -1,0 +1,14 @@
+services:
+  flutter-quest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: flutter-quest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18081:8080"
+    volumes:
+      - flutter_quest_data:/app/data
+
+volumes:
+  flutter_quest_data:
