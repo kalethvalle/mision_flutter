@@ -1,0 +1,19 @@
+services:
+  flutter-quest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        FLUTTER_VERSION: ${FLUTTER_VERSION:-3.47.9}
+    container_name: flutter-quest-sqlite
+    restart: unless-stopped
+    environment:
+      ANALYTICS_STORE: sqlite
+      ANALYTICS_REFRESH_MODE: manual
+    ports:
+      - "127.0.0.1:${FLUTTER_QUEST_HOST_PORT:-18081}:8080"
+    volumes:
+      - flutter_quest_sqlite_data:/app/data
+
+volumes:
+  flutter_quest_sqlite_data:

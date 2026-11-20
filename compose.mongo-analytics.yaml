@@ -1,0 +1,49 @@
+services:
+  flutter-quest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        FLUTTER_VERSION: ${FLUTTER_VERSION:-3.47.9}
+    container_name: flutter-quest-mongo-analytics
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      ANALYTICS_STORE: mongo
+      ANALYTICS_REFRESH_MODE: manual
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-flutter_quest_dw}
+      MONGODB_URI: ${MONGODB_URI:-mongodb://quest_app:cambia-esto@mongo:27017/flutter_quest_dw?authSource=flutter_quest_dw}
+    ports:
+      - "127.0.0.1:${FLUTTER_QUEST_HOST_PORT:-18081}:8080"
+    volumes:
+      - flutter_quest_sqlite_data:/app/data
+
+  mongo:
+    image: mongo:7
+    container_name: flutter-quest-analytics-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_ROOT_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD:-cambia-esto}
+      MONGO_INITDB_DATABASE: ${MONGODB_DATABASE:-flutter_quest_dw}
+      MONGODB_APP_USER: ${MONGODB_APP_USER:-quest_app}
+      MONGODB_APP_PASSWORD: ${MONGODB_APP_PASSWORD:-cambia-esto}
+    volumes:
+      - flutter_quest_mongo_data:/data/db
+      - ./docker/mongo/init-analytics-user.js:/docker-entrypoint-initdb.d/init-analytics-user.js:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet -u \"$${MONGO_INITDB_ROOT_USERNAME}\" -p \"$${MONGO_INITDB_ROOT_PASSWORD}\" --authenticationDatabase admin --eval 'db.adminCommand({ ping: 1 }).ok' || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  flutter_quest_sqlite_data:
+  flutter_quest_mongo_data:

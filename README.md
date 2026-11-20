@@ -12,11 +12,19 @@ La [planificación SDD de las 12 historias de usuario](docs/stories-users.md)
 describe la evolución del producto. Las features verificadas se registran en
 [`.specs/context.md`](.specs/context.md).
 
+El RFC técnico de arquitectura y operación está en
+[`docs/rfc-isekai-code-parcial.md`](docs/rfc-isekai-code-parcial.md).
+
 El entregable academico de data warehouse MongoDB para metricas docentes esta
 documentado en
 [`docs/mongodb-teacher-metrics/README.md`](docs/mongodb-teacher-metrics/README.md).
 Ese escenario es analitico y derivado; SQLite/API sigue siendo la fuente de
 verdad de la aplicacion.
+
+El despliegue funcional con SQLite y MongoDB analitico esta documentado en
+[`docs/despliegue-analytics-docker.md`](docs/despliegue-analytics-docker.md);
+los MER SQL/MongoDB para el RFC estan en
+[`docs/architecture/analytics-data-models.md`](docs/architecture/analytics-data-models.md).
 
 La guía de despliegue en Ubuntu con Docker y Cloudflare Tunnel está en
 [`docs/despliegue-docker-cloudflare.md`](docs/despliegue-docker-cloudflare.md).

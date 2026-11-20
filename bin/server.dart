@@ -15,7 +15,9 @@ import 'package:mision_flutter/server/api/app_api.dart';
 import 'package:mision_flutter/server/api/catalog_api.dart';
 import 'package:mision_flutter/server/api/identity_api.dart';
 import 'package:mision_flutter/server/api/training_api.dart';
+import 'package:mision_flutter/server/analytics/analytics_backend_config.dart';
 import 'package:mision_flutter/server/database/catalog_database.dart';
+import 'package:mision_flutter/server/repositories/mongo_analytics_store.dart';
 import 'package:mision_flutter/server/repositories/sqlite_catalog_repository.dart';
 import 'package:mision_flutter/server/repositories/sqlite_analytics_store.dart';
 import 'package:mision_flutter/server/repositories/sqlite_authoring_store.dart';
@@ -28,14 +30,26 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 Future<void> main(List<String> arguments) async {
   final options = _ServerOptions.parse(arguments);
   CatalogDatabase? catalogDatabase;
+  MongoAnalyticsStore? mongoAnalyticsStore;
   try {
     catalogDatabase = CatalogDatabase.open(options.databasePath);
+    final analyticsConfig = AnalyticsBackendConfig.fromEnvironment(
+      Platform.environment,
+    );
     final catalogRepository = SqliteCatalogRepository(catalogDatabase.database);
     final identityStore = SqliteIdentityStore(catalogDatabase.database);
     final progressStore = SqliteProgressStore(catalogDatabase.database);
     final authoringStore = SqliteAuthoringStore(catalogDatabase.database);
     final assessmentStore = SqliteAssessmentStore(catalogDatabase.database);
-    final analyticsStore = SqliteAnalyticsStore(catalogDatabase.database);
+    final sqliteAnalyticsStore = SqliteAnalyticsStore(catalogDatabase.database);
+    final analyticsStore = switch (analyticsConfig.backend) {
+      AnalyticsBackend.sqlite => sqliteAnalyticsStore,
+      AnalyticsBackend.mongo => mongoAnalyticsStore = MongoAnalyticsStore(
+        sqliteDatabase: catalogDatabase.database,
+        mongoUri: analyticsConfig.mongoUri!,
+        mongoDatabase: analyticsConfig.mongoDatabase,
+      ),
+    };
     final identityService = IdentityService(identityStore);
     final security = ApiSecurity(identityService);
     final apiHandler = createApiHandler(
@@ -74,6 +88,11 @@ Future<void> main(List<String> arguments) async {
       'Flutter Quest disponible en http://${server.address.host}:${server.port}',
     );
     stdout.writeln('SQLite: ${catalogDatabase.databasePath}');
+    stdout.writeln(
+      analyticsConfig.backend == AnalyticsBackend.mongo
+          ? 'Analytics: MongoDB (${analyticsConfig.mongoDatabase})'
+          : 'Analytics: SQLite',
+    );
 
     final shutdown = Completer<void>();
     final subscriptions = <StreamSubscription<ProcessSignal>>[
@@ -95,6 +114,7 @@ Future<void> main(List<String> arguments) async {
       ..writeln(stackTrace);
     exitCode = 1;
   } finally {
+    await mongoAnalyticsStore?.close();
     catalogDatabase?.close();
   }
 }
