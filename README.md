@@ -12,11 +12,22 @@ La [planificación SDD de las 12 historias de usuario](docs/stories-users.md)
 describe la evolución del producto. Las features verificadas se registran en
 [`.specs/context.md`](.specs/context.md).
 
+El RFC técnico de arquitectura y operación está en
+[`docs/rfc-isekai-code-parcial.md`](docs/rfc-isekai-code-parcial.md).
+
 El entregable academico de data warehouse MongoDB para metricas docentes esta
 documentado en
 [`docs/mongodb-teacher-metrics/README.md`](docs/mongodb-teacher-metrics/README.md).
 Ese escenario es analitico y derivado; SQLite/API sigue siendo la fuente de
 verdad de la aplicacion.
+
+El despliegue funcional con SQLite y MongoDB analitico esta documentado en
+[`docs/despliegue-analytics-docker.md`](docs/despliegue-analytics-docker.md);
+los MER SQL/MongoDB para el RFC estan en
+[`docs/architecture/analytics-data-models.md`](docs/architecture/analytics-data-models.md).
+
+La guía de despliegue en Ubuntu con Docker y Cloudflare Tunnel está en
+[`docs/despliegue-docker-cloudflare.md`](docs/despliegue-docker-cloudflare.md).
 
 ## Ejecutar la versión web local
 
@@ -94,5 +105,21 @@ El proyecto Flutter conserva sus plataformas móviles, pero Android no se
 declara verificado en esta fase. La aplicación actual usa el adaptador HTTP
 pensado para el servidor web local; una fase posterior añadirá un adaptador
 SQLite nativo para Android reutilizando los modelos y contratos del catálogo.
+
+Para compilar el APK apuntando al servidor publicado por Cloudflare Tunnel:
+
+```sh
+flutter build apk --release \
+  --dart-define=API_BASE_URL=https://isekai-code-lerning.kvf-enginner.com/api/v1/
+```
+
+El APK generado queda en:
+
+```text
+build/app/outputs/flutter-apk/app-release.apk
+```
+
+Cada vez que cambie el dominio o ruta pública de la API, recompila el APK con
+el nuevo `API_BASE_URL`.
 
 Consulta la [documentación oficial de compilación Android](https://docs.flutter.dev/deployment/android).

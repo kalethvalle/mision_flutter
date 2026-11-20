@@ -1,0 +1,8 @@
+.dart_tool/
+.git/
+.idea/
+.vscode/
+build/
+data/
+docs/mongodb-teacher-metrics/node_modules/
+*.log

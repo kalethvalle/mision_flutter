@@ -1,11 +1,11 @@
 {
-    "name": "mision_flutter",
-    "short_name": "mision_flutter",
+    "name": "Isekai Code Parcial",
+    "short_name": "Isekai Code",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Isekai Code Parcial",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

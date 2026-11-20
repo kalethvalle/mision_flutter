@@ -108,4 +108,52 @@ void main() {
       ),
     );
   });
+
+  test('reenvía la cookie de sesión recibida por login', () async {
+    final observedCookies = <String?>[];
+    final client = MockClient((request) async {
+      observedCookies.add(request.headers['cookie']);
+      if (request.url.path == '/api/v1/auth/login') {
+        return http.Response(
+          jsonEncode({
+            'user': {
+              'id': 'student_1',
+              'username': 'ana',
+              'displayName': 'Ana',
+              'role': 'student',
+            },
+          }),
+          200,
+          headers: const {
+            'content-type': 'application/json; charset=utf-8',
+            'set-cookie':
+                'fq_session=token_123; HttpOnly; SameSite=Strict; Path=/',
+          },
+        );
+      }
+      if (request.url.path == '/api/v1/worlds') {
+        return http.Response(
+          jsonEncode({'worlds': const <Object>[]}),
+          200,
+          headers: const {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      return http.Response(
+        jsonEncode({
+          'error': {'code': 'not_found', 'message': 'No encontrado'},
+        }),
+        404,
+        headers: const {'content-type': 'application/json; charset=utf-8'},
+      );
+    });
+    final repository = HttpCatalogRepository(
+      client: client,
+      baseUri: Uri.parse('https://example.test/api/v1/'),
+    );
+
+    await repository.login(username: 'ana', password: 'clave');
+    await repository.listWorlds();
+
+    expect(observedCookies, [isNull, 'fq_session=token_123']);
+  });
 }

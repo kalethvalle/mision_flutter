@@ -25,6 +25,9 @@ class HttpCatalogRepository implements FlutterQuestRepository {
 
   final http.Client _client;
   final Uri _baseUri;
+  String? _sessionCookie;
+
+  static const _sessionCookieName = 'fq_session';
 
   @override
   Future<List<WorldModel>> listWorlds() async {
@@ -255,7 +258,8 @@ class HttpCatalogRepository implements FlutterQuestRepository {
       if (topicId != null && topicId.isNotEmpty) 'topicId': topicId,
     };
     final uri = _baseUri.resolve('reports').replace(queryParameters: query);
-    final response = await _client.get(uri);
+    final response = await _client.get(uri, headers: _headers());
+    _captureSessionCookie(response);
     final json = _decode(response);
     _throwWhenFailed(response, json);
     return TeacherReport.fromJson(_object(json, 'report'));
@@ -328,7 +332,11 @@ class HttpCatalogRepository implements FlutterQuestRepository {
   }
 
   Future<Map<String, Object?>> _get(String path) async {
-    final response = await _client.get(_baseUri.resolve(path));
+    final response = await _client.get(
+      _baseUri.resolve(path),
+      headers: _headers(),
+    );
+    _captureSessionCookie(response);
     final json = _decode(response);
     _throwWhenFailed(response, json);
     return json;
@@ -340,9 +348,10 @@ class HttpCatalogRepository implements FlutterQuestRepository {
   ) async {
     final response = await _client.post(
       _baseUri.resolve(path),
-      headers: const {'content-type': 'application/json; charset=utf-8'},
+      headers: _headers(json: true),
       body: jsonEncode(body),
     );
+    _captureSessionCookie(response);
     final json = _decode(response);
     _throwWhenFailed(response, json);
     return json;
@@ -354,9 +363,10 @@ class HttpCatalogRepository implements FlutterQuestRepository {
   ) async {
     final response = await _client.patch(
       _baseUri.resolve(path),
-      headers: const {'content-type': 'application/json; charset=utf-8'},
+      headers: _headers(json: true),
       body: jsonEncode(body),
     );
+    _captureSessionCookie(response);
     final json = _decode(response);
     _throwWhenFailed(response, json);
     return json;
@@ -378,12 +388,32 @@ class HttpCatalogRepository implements FlutterQuestRepository {
   ) async {
     final response = await _client.put(
       _baseUri.resolve(path),
-      headers: const {'content-type': 'application/json; charset=utf-8'},
+      headers: _headers(json: true),
       body: jsonEncode(body),
     );
+    _captureSessionCookie(response);
     final json = _decode(response);
     _throwWhenFailed(response, json);
     return json;
+  }
+
+  Map<String, String> _headers({bool json = false}) {
+    return {
+      if (json) 'content-type': 'application/json; charset=utf-8',
+      if (_sessionCookie != null) 'cookie': _sessionCookie!,
+    };
+  }
+
+  void _captureSessionCookie(http.Response response) {
+    final header = response.headers['set-cookie'];
+    if (header == null || header.isEmpty) return;
+    final pair = header.split(';').first.trim();
+    final separator = pair.indexOf('=');
+    if (separator < 0) return;
+    final name = pair.substring(0, separator);
+    if (name != _sessionCookieName) return;
+    final value = pair.substring(separator + 1);
+    _sessionCookie = value.isEmpty ? null : pair;
   }
 
   Map<String, Object?> _decode(http.Response response) {
